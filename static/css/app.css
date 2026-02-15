@@ -57,6 +57,22 @@ body {
   box-shadow: 0 16px 40px rgba(2, 6, 23, 0.08);
 }
 
+.am-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  background: var(--am-card);
+  border: 1px solid var(--am-border);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.am-chip i {
+  opacity: 0.75;
+}
+
 .am-hero {
   border-radius: 1.25rem;
   border: 1px solid var(--am-border);

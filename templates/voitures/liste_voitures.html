@@ -9,14 +9,26 @@
 <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
   <div>
     <h1 class="h3 mb-1">Explorer les voitures</h1>
-    <div class="am-muted">
+    <div class="am-muted d-flex flex-wrap gap-2 align-items-center">
       {% if prix_moyen %}
-        Prix moyen: <span class="fw-semibold">{{ prix_moyen|fcfa }}</span>
+        <span class="badge text-bg-light am-badge">Prix moyen {{ prix_moyen|fcfa }}</span>
       {% endif %}
       {% if voitures.paginator.count %}
-        <span class="mx-2">•</span>{{ voitures.paginator.count }} résultat{{ voitures.paginator.count|pluralize }}
+        <span class="badge text-bg-light am-badge">{{ voitures.paginator.count }} résultat{{ voitures.paginator.count|pluralize }}</span>
       {% endif %}
     </div>
+    {% if q or marque_selected or prix_min or prix_max or annee_min or annee_max or statut %}
+      <div class="d-flex flex-wrap gap-2 mt-2">
+        {% if q %}<button type="button" class="am-chip" data-remove-filter="q">{{ q }} <i class="fa-solid fa-xmark"></i></button>{% endif %}
+        {% if marque_selected %}<button type="button" class="am-chip" data-remove-filter="marque">Marque {{ marque_selected }} <i class="fa-solid fa-xmark"></i></button>{% endif %}
+        {% if prix_min %}<button type="button" class="am-chip" data-remove-filter="prix_min">Min {{ prix_min }} <i class="fa-solid fa-xmark"></i></button>{% endif %}
+        {% if prix_max %}<button type="button" class="am-chip" data-remove-filter="prix_max">Max {{ prix_max }} <i class="fa-solid fa-xmark"></i></button>{% endif %}
+        {% if annee_min %}<button type="button" class="am-chip" data-remove-filter="annee_min">≥ {{ annee_min }} <i class="fa-solid fa-xmark"></i></button>{% endif %}
+        {% if annee_max %}<button type="button" class="am-chip" data-remove-filter="annee_max">≤ {{ annee_max }} <i class="fa-solid fa-xmark"></i></button>{% endif %}
+        {% if statut %}<button type="button" class="am-chip" data-remove-filter="statut">{{ statut|capfirst }} <i class="fa-solid fa-xmark"></i></button>{% endif %}
+        <a class="am-chip text-decoration-none" href="{% url 'liste_voitures' %}">Réinitialiser</a>
+      </div>
+    {% endif %}
   </div>
 
   <div class="d-flex gap-2">
@@ -34,9 +46,9 @@
 
 <div class="row g-4">
   <aside class="col-lg-3">
-    <div class="am-card p-3 p-lg-4 d-none d-lg-block">
+    <div class="am-card p-3 p-lg-4 d-none d-lg-block sticky-top" style="top: 92px;">
       <h2 class="h6 mb-3">Filtres</h2>
-      <form method="get" action="{% url 'liste_voitures' %}" class="vstack gap-3">
+      <form id="filtersFormDesktop" method="get" action="{% url 'liste_voitures' %}" class="vstack gap-3">
         <div>
           <label class="form-label" for="q">Recherche</label>
           <input class="form-control" id="q" name="q" value="{{ q|default:'' }}" placeholder="Marque, modèle, description">
@@ -193,7 +205,7 @@
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fermer"></button>
   </div>
   <div class="offcanvas-body">
-    <form method="get" action="{% url 'liste_voitures' %}" class="vstack gap-3">
+    <form id="filtersFormMobile" method="get" action="{% url 'liste_voitures' %}" class="vstack gap-3">
       <div>
         <label class="form-label" for="q_mobile">Recherche</label>
         <input class="form-control" id="q_mobile" name="q" value="{{ q|default:'' }}" placeholder="Marque, modèle, description">
@@ -250,6 +262,28 @@
       <div class="d-grid gap-2 mt-1">
         <button class="btn btn-primary" type="submit"><i class="fa-solid fa-filter me-2"></i>Appliquer</button>
         <a class="btn btn-outline-secondary" href="{% url 'liste_voitures' %}">Réinitialiser</a>
+      </div>
+
+      <div class="mt-3">
+        <div class="small am-muted mb-2">Raccourcis</div>
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-sm btn-outline-secondary" type="button"
+                  data-quick-filter="prix_max=5000000" data-form="#filtersFormMobile">
+            &lt; 5 M FCFA
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" type="button"
+                  data-quick-filter="prix_min=5000000,prix_max=15000000" data-form="#filtersFormMobile">
+            5–15 M
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" type="button"
+                  data-quick-filter="annee_min=2018" data-form="#filtersFormMobile">
+            ≥ 2018
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" type="button"
+                  data-quick-filter="statut=disponible" data-form="#filtersFormMobile">
+            Disponibles
+          </button>
+        </div>
       </div>
     </form>
   </div>

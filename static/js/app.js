@@ -54,3 +54,48 @@ document.addEventListener("click", (event) => {
 });
 
 initTheme();
+
+// ======================
+// Filtres (listings)
+// ======================
+
+// Retire un ou plusieurs paramètres de la query-string puis recharge
+document.addEventListener("click", (event) => {
+  const chip = event.target.closest("[data-remove-filter]");
+  if (!chip) return;
+  const paramsToRemove = (chip.getAttribute("data-remove-filter") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!paramsToRemove.length) return;
+
+  const url = new URL(window.location.href);
+  paramsToRemove.forEach((p) => url.searchParams.delete(p));
+  // Si la page était paginée, on revient à la page 1
+  url.searchParams.delete("page");
+  window.location.href = url.toString();
+});
+
+// Boutons de presets pour remplir rapidement le formulaire de filtres (mobile/offcanvas)
+document.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-quick-filter]");
+  if (!btn) return;
+
+  const formSelector = btn.getAttribute("data-form") || "#filtersFormMobile";
+  const form = document.querySelector(formSelector);
+  if (!form) return;
+
+  const presets = (btn.getAttribute("data-quick-filter") || "").split(",");
+  presets.forEach((pair) => {
+    const [name, value] = pair.split("=");
+    if (!name) return;
+    const input = form.querySelector(`[name="${name}"]`);
+    if (input) input.value = value ?? "";
+  });
+
+  // Remettre la pagination à 1
+  const pageInput = form.querySelector('[name="page"]');
+  if (pageInput) pageInput.value = "";
+
+  form.submit();
+});
