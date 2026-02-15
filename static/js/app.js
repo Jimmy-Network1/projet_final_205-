@@ -137,6 +137,16 @@ window.addEventListener("pageshow", () => {
   });
 });
 
+// Bootstrap toasts (messages Django)
+document.addEventListener("DOMContentLoaded", () => {
+  const toasts = document.querySelectorAll(".toast");
+  if (!toasts.length) return;
+  toasts.forEach((el) => {
+    const toast = bootstrap.Toast.getOrCreateInstance(el);
+    toast.show();
+  });
+});
+
 // Helpers de formatage (prix / km) et compteur de caractères
 document.addEventListener("DOMContentLoaded", () => {
   const priceInput = document.querySelector("[data-price-display]");

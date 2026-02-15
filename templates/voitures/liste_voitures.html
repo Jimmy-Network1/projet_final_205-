@@ -122,10 +122,14 @@
           <div class="col-md-6 col-xl-4">
             <div class="am-card am-card-hover h-100 overflow-hidden">
               <div class="ratio ratio-16x9 bg-light position-relative">
-                {% if voiture.est_reservee %}
+                {% if voiture.est_vendue %}
+                  <span class="badge text-bg-danger position-absolute top-0 start-0 m-3">Vendue</span>
+                {% elif voiture.est_reservee %}
                   <span class="badge text-bg-warning position-absolute top-0 start-0 m-3">Réservée</span>
+                {% else %}
+                  <span class="badge text-bg-success position-absolute top-0 start-0 m-3">Disponible</span>
                 {% endif %}
-                <img class="am-img-cover" src="{{ voiture.image_principale.url }}"
+                <img class="am-img-cover am-img-skeleton" src="{{ voiture.image_principale.url }}"
                      onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
                      alt="{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}" loading="lazy">
               </div>
@@ -150,7 +154,7 @@
                   {% if user.is_authenticated and user != voiture.vendeur %}
                     <form method="post" action="{% url 'toggle_favori' voiture.id %}">
                       {% csrf_token %}
-                      <button class="btn btn-outline-danger w-100" type="submit">
+                      <button class="btn btn-outline-danger w-100" type="submit" aria-label="Ajouter aux favoris">
                         <i class="fa-regular fa-heart me-2"></i> Favori
                       </button>
                     </form>

@@ -12,16 +12,16 @@
     <div class="row align-items-center g-5">
       <div class="col-lg-7">
         <div class="hero-badges d-flex flex-wrap gap-2 mb-3 reveal-up">
-          <span class="badge rounded-pill px-3 py-2"><i class="fa-solid fa-shield-halved me-2"></i>Offres vérifiées</span>
-          <span class="badge rounded-pill px-3 py-2"><i class="fa-solid fa-magnifying-glass me-2"></i>Recherche rapide</span>
-          <span class="badge rounded-pill px-3 py-2"><i class="fa-regular fa-heart me-2"></i>Favoris</span>
+          <span class="badge rounded-pill px-3 py-2 bg-white text-dark"><i class="fa-solid fa-shield-halved me-2 text-success"></i>Transactions sécurisées</span>
+          <span class="badge rounded-pill px-3 py-2 bg-white text-dark"><i class="fa-solid fa-magnifying-glass me-2 text-primary"></i>Recherche rapide</span>
+          <span class="badge rounded-pill px-3 py-2 bg-white text-dark"><i class="fa-regular fa-heart me-2 text-danger"></i>Favoris</span>
         </div>
 
         <h1 class="display-4 fw-semibold text-white hero-title mb-3 reveal-up delay-1">
-          Trouvez votre prochaine voiture
+          Votre prochaine voiture, en quelques clics.
         </h1>
         <p class="lead hero-subtitle mb-4 reveal-up delay-2">
-          Une expérience simple et premium: annonces claires, filtres rapides, favoris, et achat en ligne.
+          Une expérience simple et premium : annonces claires, filtres rapides, favoris et suivi d’achat.
         </p>
 
         <div class="hero-actions d-flex flex-wrap gap-2 reveal-up delay-3">
@@ -39,18 +39,18 @@
           {% endif %}
         </div>
 
-        <div class="hero-kpis p-3 p-md-4 mt-4 reveal-up delay-4">
+        <div class="hero-kpis p-3 p-md-4 mt-4 reveal-up delay-4 am-card bg-white bg-opacity-75 border-0">
           <div class="row g-3">
-            <div class="col-4">
-              <div class="label small mb-1">Disponibles</div>
-              <div class="h4 mb-0 value">{{ total_voitures }}</div>
+            <div class="col-4 text-center">
+              <div class="small am-muted"><i class="fa-solid fa-car-side me-2"></i>Disponibles</div>
+              <div class="h4 mb-0 value">{{ total_voitures|default:0|floatformat:0 }}</div>
             </div>
-            <div class="col-4">
-              <div class="label small mb-1">Marques</div>
+            <div class="col-4 text-center">
+              <div class="small am-muted"><i class="fa-solid fa-award me-2"></i>Marques</div>
               <div class="h4 mb-0 value">{{ marques_populaires|length }}</div>
             </div>
-            <div class="col-4">
-              <div class="label small mb-1">Nouveautés</div>
+            <div class="col-4 text-center">
+              <div class="small am-muted"><i class="fa-regular fa-clock me-2"></i>Nouveautés</div>
               <div class="h4 mb-0 value">{{ voitures_recentes|length }}</div>
             </div>
           </div>

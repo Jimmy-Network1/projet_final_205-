@@ -46,39 +46,57 @@
 
         <div class="row g-3">
           <div class="col-md-4">
-            <div class="am-kpi p-3 h-100">
-              <div class="small am-muted">État</div>
-              <div class="fw-semibold">{{ voiture.get_etat_display }}</div>
+            <div class="am-kpi p-3 h-100 d-flex align-items-center gap-3">
+              <div class="brand-mark"><i class="fa-solid fa-sparkles"></i></div>
+              <div>
+                <div class="small am-muted">État</div>
+                <div class="fw-semibold">{{ voiture.get_etat_display }}</div>
+              </div>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="am-kpi p-3 h-100">
-              <div class="small am-muted">Carburant</div>
-              <div class="fw-semibold">{{ voiture.modele.get_type_carburant_display }}</div>
+            <div class="am-kpi p-3 h-100 d-flex align-items-center gap-3">
+              <div class="brand-mark"><i class="fa-solid fa-gas-pump"></i></div>
+              <div>
+                <div class="small am-muted">Carburant</div>
+                <div class="fw-semibold">{{ voiture.modele.get_type_carburant_display }}</div>
+              </div>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="am-kpi p-3 h-100">
-              <div class="small am-muted">Transmission</div>
-              <div class="fw-semibold">{{ voiture.modele.get_transmission_display }}</div>
+            <div class="am-kpi p-3 h-100 d-flex align-items-center gap-3">
+              <div class="brand-mark"><i class="fa-solid fa-gear"></i></div>
+              <div>
+                <div class="small am-muted">Transmission</div>
+                <div class="fw-semibold">{{ voiture.modele.get_transmission_display }}</div>
+              </div>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="am-kpi p-3 h-100">
-              <div class="small am-muted">Puissance</div>
-              <div class="fw-semibold">{{ voiture.modele.puissance }} ch</div>
+            <div class="am-kpi p-3 h-100 d-flex align-items-center gap-3">
+              <div class="brand-mark"><i class="fa-solid fa-bolt"></i></div>
+              <div>
+                <div class="small am-muted">Puissance</div>
+                <div class="fw-semibold">{{ voiture.modele.puissance }} ch</div>
+              </div>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="am-kpi p-3 h-100">
-              <div class="small am-muted">Conso</div>
-              <div class="fw-semibold">{{ voiture.modele.consommation }} L/100</div>
+            <div class="am-kpi p-3 h-100 d-flex align-items-center gap-3">
+              <div class="brand-mark"><i class="fa-solid fa-droplet"></i></div>
+              <div>
+                <div class="small am-muted">Conso</div>
+                <div class="fw-semibold">{{ voiture.modele.consommation }} L/100</div>
+              </div>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="am-kpi p-3 h-100">
-              <div class="small am-muted">Vendeur</div>
-              <div class="fw-semibold">{{ voiture.vendeur.username }}</div>
+            <div class="am-kpi p-3 h-100 d-flex align-items-center gap-3">
+              <div class="brand-mark"><i class="fa-regular fa-user"></i></div>
+              <div>
+                <div class="small am-muted">Vendeur</div>
+                <div class="fw-semibold">{{ voiture.vendeur.username }}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -130,6 +148,9 @@
               </div>
               <div class="small am-muted">{{ a.date_publication|date:"d/m/Y" }}</div>
               <div class="mt-2">{{ a.commentaire }}</div>
+              {% if not a.approuve %}
+                <span class="badge text-bg-secondary mt-2">En attente de validation</span>
+              {% endif %}
             </div>
           {% endfor %}
         </div>
