@@ -152,6 +152,13 @@ if "test" in sys.argv:
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+# Projet académique / démos: on sert les médias via Django/Gunicorn par défaut.
+# Désactivez via SERVE_MEDIA=false si vous servez MEDIA_URL autrement (Nginx, stockage externe, etc.).
+SERVE_MEDIA = _env_bool("SERVE_MEDIA", default=True)
+
+# Dossier (dans le repo) qui contient un "catalogue" de logos de marques.
+# Utilisé comme fallback si `Marque.logo` n'est pas défini.
+BRAND_LOGO_CATALOG_DIR = BASE_DIR / "logo"
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

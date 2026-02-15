@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
+
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import Avis, Conversation, Marque, Message, Modele, Transaction, Voiture
@@ -267,3 +271,92 @@ class AdminModerationAndMessagingTests(TestCase):
         self.assertEqual(resp.status_code, 302)
         self.assertTrue(Conversation.objects.exists())
         self.assertTrue(Message.objects.exists())
+
+
+class BrandUiTests(TestCase):
+    def test_marque_logo_svg_endpoint(self):
+        marque = Marque.objects.create(nom="Citroën", pays="France", date_creation="2000-01-01")
+        resp = self.client.get(reverse("marque_logo_svg", args=[marque.id]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp["Content-Type"].startswith("image/svg+xml"))
+        self.assertIn(b"CI", resp.content.upper())
+
+    def test_marque_logo_endpoint_catalog_then_fallback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            catalog = Path(tmpdir)
+            catalog.joinpath("citroen.svg").write_text("<svg>CI</svg>", encoding="utf-8")
+
+            with override_settings(BRAND_LOGO_CATALOG_DIR=catalog):
+                marque = Marque.objects.create(nom="Citroën", pays="France", date_creation="2000-01-01")
+                resp = self.client.get(reverse("marque_logo", args=[marque.id]))
+                self.assertEqual(resp.status_code, 200)
+                self.assertTrue(resp["Content-Type"].startswith("image/svg+xml"))
+                body = b"".join(resp.streaming_content)
+                self.assertIn(b"CI", body.upper())
+
+                other = Marque.objects.create(nom="NoBrand", pays="—", date_creation="2000-01-01")
+                resp2 = self.client.get(reverse("marque_logo", args=[other.id]))
+                self.assertEqual(resp2.status_code, 200)
+                self.assertTrue(resp2["Content-Type"].startswith("image/svg+xml"))
+
+    def test_admin_can_access_marque_crud_pages(self):
+        admin_user = User.objects.create_superuser(
+            username="admin",
+            password="Admin123!",
+            email="admin@test.local",
+        )
+        self.client.force_login(admin_user)
+        self.assertEqual(self.client.get(reverse("admin:voitures_marque_changelist")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("admin:voitures_marque_add")).status_code, 200)
+
+    def test_dashboard_marques_requires_staff(self):
+        user = User.objects.create_user(username="u1", password="Pass123456!")
+        self.client.force_login(user)
+        resp = self.client.get(reverse("dashboard_marques"))
+        self.assertEqual(resp.status_code, 302)
+
+    def test_dashboard_marques_allows_add_with_logo(self):
+        admin_user = User.objects.create_user(username="admin2", password="Admin123!", is_staff=True)
+        self.client.force_login(admin_user)
+
+        png = (
+            b"\x89PNG\r\n\x1a\n"
+            b"\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+            b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4"
+            b"\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+        logo = SimpleUploadedFile("brand.png", png, content_type="image/png")
+
+        with tempfile.TemporaryDirectory() as media_tmp:
+            with override_settings(MEDIA_ROOT=media_tmp):
+                resp = self.client.post(
+                    reverse("dashboard_marque_add"),
+                    data={
+                        "nom": "Tesla",
+                        "pays": "USA",
+                        "date_creation": "2000-01-01",
+                        "description": "Electric",
+                        "logo": logo,
+                    },
+                    follow=True,
+                )
+                self.assertEqual(resp.status_code, 200)
+                self.assertTrue(Marque.objects.filter(nom="Tesla").exists())
+                marque = Marque.objects.get(nom="Tesla")
+                self.assertTrue(getattr(marque.logo, "name", ""))
+
+    def test_new_marque_appears_in_publish_form(self):
+        marque = Marque.objects.create(nom="Tesla", pays="USA", date_creation="2000-01-01")
+        user = User.objects.create_user(username="u1", password="Pass123456!")
+        self.client.force_login(user)
+        resp = self.client.get(reverse("ajouter_voiture"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, marque.nom)
+
+    def test_public_brands_page_lists_all_marques(self):
+        m1 = Marque.objects.create(nom="Renault", pays="France", date_creation="2000-01-01")
+        m2 = Marque.objects.create(nom="Toyota", pays="Japon", date_creation="2000-01-01")
+        resp = self.client.get(reverse("liste_marques"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, m1.nom)
+        self.assertContains(resp, m2.nom)

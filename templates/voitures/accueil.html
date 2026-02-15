@@ -174,26 +174,29 @@
 
   <div class="d-flex align-items-end justify-content-between gap-3 mb-3">
     <div>
-      <h2 class="h4 mb-1 home-section-title">Marques populaires</h2>
-      <p class="am-muted mb-0">Les marques les plus présentes sur la plateforme.</p>
+      <h2 class="h4 mb-1 home-section-title">Marques</h2>
+      <p class="am-muted mb-0">Les marques disponibles sur la plateforme (mise à jour automatiquement).</p>
     </div>
-    <a class="btn btn-sm btn-outline-secondary" href="{% url 'liste_voitures' %}">Voir tout</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'liste_marques' %}">Voir tout</a>
   </div>
 
   <div class="row g-3">
-    {% for marque in marques_populaires %}
+    {% for marque in marques_home %}
       <div class="col-6 col-md-3 col-lg-2">
-        <div class="am-card am-card-hover p-3 h-100 text-center">
-          <div class="mb-2">
-            {% if marque.logo %}
-              <img src="{{ marque.logo.url }}" alt="{{ marque.nom }}" style="height:40px; width:auto" loading="lazy">
-            {% else %}
-              <span class="badge text-bg-light am-badge">{{ marque.nom|slice:":1" }}</span>
-            {% endif %}
+        <a class="am-card am-card-hover p-3 h-100 text-center text-decoration-none" href="{% url 'liste_voitures' %}?marque={{ marque.id }}">
+          <div class="d-flex justify-content-center">
+            <div class="brand-tile">
+              <img
+                class="brand-logo"
+                src="{% url 'marque_logo' marque.id %}"
+                alt="{{ marque.nom }}"
+                loading="lazy"
+                onerror="this.onerror=null;this.src='{% url 'marque_logo_svg' marque.id %}';"
+              >
+            </div>
           </div>
-          <div class="fw-semibold">{{ marque.nom }}</div>
-          <div class="small am-muted">{{ marque.pays }}</div>
-        </div>
+          <div class="fw-semibold mt-2 brand-name">{{ marque.nom }}</div>
+        </a>
       </div>
     {% empty %}
       <div class="col-12">

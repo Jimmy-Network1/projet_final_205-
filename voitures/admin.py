@@ -28,7 +28,7 @@ class ImageVoitureInline(admin.TabularInline):
 
 @admin.register(Marque)
 class MarqueAdmin(admin.ModelAdmin):
-    list_display = ['nom', 'pays', 'date_creation', 'nombre_modeles', 'nombre_voitures']
+    list_display = ['logo_preview', 'nom', 'pays', 'date_creation', 'nombre_modeles', 'nombre_voitures']
     list_filter = ['pays', 'date_creation']
     search_fields = ['nom', 'pays']
     readonly_fields = ['nombre_modeles', 'nombre_voitures']
@@ -41,6 +41,19 @@ class MarqueAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+    def logo_preview(self, obj):
+        if getattr(obj, "logo", None):
+            try:
+                return format_html(
+                    '<img src="{}" style="height:28px; width:auto; max-width:64px; object-fit:contain;" alt="{}" />',
+                    obj.logo.url,
+                    obj.nom,
+                )
+            except Exception:
+                return "—"
+        return "—"
+    logo_preview.short_description = "Logo"
 
 @admin.register(Modele)
 class ModeleAdmin(admin.ModelAdmin):

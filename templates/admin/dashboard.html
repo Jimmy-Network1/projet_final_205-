@@ -11,7 +11,12 @@
     <h1 class="h3 mb-1">Dashboard</h1>
     <p class="am-muted mb-0">Vue d'ensemble de l'activité (admin).</p>
   </div>
-  <a class="btn btn-outline-secondary" href="{% url 'accueil' %}">Accueil</a>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'accueil' %}">Accueil</a>
+    <a class="btn btn-outline-primary" href="{% url 'dashboard_marques' %}">
+      <i class="fa-regular fa-rectangle-list me-2"></i>Marques
+    </a>
+  </div>
 </div>
 
 <div class="row g-3 mb-4">

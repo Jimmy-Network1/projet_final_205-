@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}Supprimer {{ marque.nom }} - Dashboard{% endblock %}
+{% block main_class %}container py-4{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-1">Supprimer la marque</h1>
+    <p class="am-muted mb-0">Cette action est irréversible.</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'dashboard_marques' %}">Retour</a>
+</div>
+
+<div class="am-card p-4 p-md-5">
+  <div class="d-flex align-items-center gap-3 mb-3">
+    <div class="brand-tile brand-tile-lg">
+      <img class="brand-logo" src="{% url 'marque_logo' marque.id %}" alt="{{ marque.nom }}">
+    </div>
+    <div>
+      <div class="fw-semibold">{{ marque.nom }}</div>
+      <div class="small am-muted">{{ marque.pays }}</div>
+    </div>
+  </div>
+
+  <div class="alert alert-warning">
+    <div class="fw-semibold mb-1">Attention</div>
+    <div class="small">
+      Modèles liés: <span class="fw-semibold">{{ modele_count }}</span> •
+      Voitures liées: <span class="fw-semibold">{{ voiture_count }}</span>.
+      La suppression peut entraîner la suppression en cascade des données liées.
+    </div>
+  </div>
+
+  <form method="post" class="d-flex gap-2">
+    {% csrf_token %}
+    <button class="btn btn-danger" type="submit">
+      <i class="fa-solid fa-trash me-2"></i>Supprimer définitivement
+    </button>
+    <a class="btn btn-outline-secondary" href="{% url 'dashboard_marques' %}">Annuler</a>
+  </form>
+</div>
+{% endblock %}

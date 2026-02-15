@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}Marques - AutoMarket{% endblock %}
+{% block main_class %}container py-4{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-1">Marques</h1>
+    <p class="am-muted mb-0">Découvrez toutes les marques disponibles sur la plateforme.</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'liste_voitures' %}">
+    <i class="fa-solid fa-magnifying-glass me-2"></i>Explorer les annonces
+  </a>
+</div>
+
+{% if marques %}
+  <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-6 g-3">
+    {% for marque in marques %}
+      <div class="col">
+        <a class="am-card am-card-hover p-3 h-100 text-center text-decoration-none" href="{% url 'liste_voitures' %}?marque={{ marque.id }}">
+          <div class="d-flex justify-content-center">
+            <div class="brand-tile brand-tile-lg">
+              <img class="brand-logo" src="{% url 'marque_logo' marque.id %}" alt="{{ marque.nom }}" loading="lazy">
+            </div>
+          </div>
+          <div class="fw-semibold mt-2 brand-name">{{ marque.nom }}</div>
+        </a>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="alert alert-info mb-0">Aucune marque pour le moment.</div>
+{% endif %}
+{% endblock %}
+

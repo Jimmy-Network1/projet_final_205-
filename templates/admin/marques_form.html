@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - Dashboard{% endblock %}
+{% block main_class %}container py-4{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-1">{{ title }}</h1>
+    <p class="am-muted mb-0">Le logo (optionnel) peut être uploadé depuis votre ordinateur.</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'dashboard_marques' %}">Retour</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="am-card p-4 p-md-5">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.nom.id_for_label }}">Nom</label>
+            {{ form.nom }}
+            {% if form.nom.errors %}<div class="text-danger small mt-1">{{ form.nom.errors }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.pays.id_for_label }}">Pays</label>
+            {{ form.pays }}
+            {% if form.pays.errors %}<div class="text-danger small mt-1">{{ form.pays.errors }}</div>{% endif %}
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.date_creation.id_for_label }}">Date de création</label>
+            {{ form.date_creation }}
+            {% if form.date_creation.errors %}<div class="text-danger small mt-1">{{ form.date_creation.errors }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.logo.id_for_label }}">Logo (PNG/JPG/WEBP)</label>
+            {{ form.logo }}
+            {% if form.logo.errors %}<div class="text-danger small mt-1">{{ form.logo.errors }}</div>{% endif %}
+            <div class="form-text">Taille conseillée: ~300×150px, fond transparent si possible.</div>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label" for="{{ form.description.id_for_label }}">Description</label>
+            {{ form.description }}
+            {% if form.description.errors %}<div class="text-danger small mt-1">{{ form.description.errors }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-4">
+          <button class="btn btn-primary" type="submit">{{ submit_label|default:"Enregistrer" }}</button>
+          <a class="btn btn-outline-secondary" href="{% url 'dashboard_marques' %}">Annuler</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="am-card p-4">
+      <div class="fw-semibold mb-2">Aperçu</div>
+      {% if marque %}
+        <div class="d-flex align-items-center gap-3">
+          <div class="brand-tile brand-tile-lg">
+            <img class="brand-logo" src="{% url 'marque_logo' marque.id %}" alt="{{ marque.nom }}">
+          </div>
+          <div>
+            <div class="fw-semibold">{{ marque.nom }}</div>
+            <div class="small am-muted">{{ marque.pays }}</div>
+          </div>
+        </div>
+      {% else %}
+        <div class="small am-muted">L’aperçu sera disponible après création.</div>
+      {% endif %}
+      <div class="am-divider my-3"></div>
+      <div class="small am-muted">
+        Si aucun logo n’est uploadé, le site peut utiliser un fichier présent dans <code>./logo</code>,
+        sinon un logo de fallback sera généré automatiquement.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

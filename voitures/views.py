@@ -13,7 +13,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 import os
 from decimal import Decimal, InvalidOperation
 from .models import Conversation, Marque, Modele, Voiture, Favori, Transaction, Avis, Message, Notification
-from .forms import InscriptionForm, AvisForm
+from .forms import InscriptionForm, AvisForm, MarqueManageForm
 from .services import messaging, receipts, transactions
 
 
@@ -77,11 +77,14 @@ def accueil(request):
             ),
         )
     ).order_by('-nb_voitures')[:8]
+
+    marques_home = Marque.objects.all().order_by("nom")[:18]
     
     context = {
         'voitures_recentes': voitures_recentes,
         'voitures_promo': voitures_promo,
         'marques_populaires': marques_populaires,
+        'marques_home': marques_home,
         'marques': Marque.objects.all().order_by('nom'),
         'voitures_vedette': Voiture.objects.filter(
             est_vendue=False, moderation_status="approved"
@@ -165,7 +168,7 @@ def liste_voitures(request):
     
     context = {
         'voitures': voitures,
-        'marques': Marque.objects.all(),
+        'marques': Marque.objects.all().order_by("nom"),
         'marque_selected': int(marque_id) if marque_id else None,
         'prix_min': prix_min,
         'prix_max': prix_max,
@@ -178,6 +181,12 @@ def liste_voitures(request):
         "etat_selected": etats_selected,
     }
     return render(request, 'voitures/liste_voitures.html', context)
+
+
+def liste_marques(request):
+    marques = Marque.objects.all().order_by("nom")
+    return render(request, "voitures/marques.html", {"marques": marques})
+
 
 def detail_voiture(request, voiture_id):
     """Page de détails d'une voiture"""
@@ -1036,6 +1045,95 @@ def dashboard(request):
         'notifications_recentes': notifications_recentes,
     }
     return render(request, 'admin/dashboard.html', context)
+
+
+@login_required
+def dashboard_marques(request):
+    if not request.user.is_staff:
+        return redirect("accueil")
+
+    marques = Marque.objects.all().order_by("nom")
+    return render(request, "admin/marques_list.html", {"marques": marques})
+
+
+@login_required
+def dashboard_marque_add(request):
+    if not request.user.is_staff:
+        return redirect("accueil")
+
+    if request.method == "POST":
+        form = MarqueManageForm(request.POST, request.FILES)
+        logo_file = request.FILES.get("logo")
+        if logo_file:
+            error = _validate_uploaded_image(logo_file)
+            if error:
+                form.add_error("logo", error)
+        if form.is_valid():
+            marque = form.save()
+            messages.success(request, f"Marque créée: {marque.nom}")
+            return redirect("dashboard_marques")
+    else:
+        form = MarqueManageForm()
+
+    return render(
+        request,
+        "admin/marques_form.html",
+        {"form": form, "title": "Ajouter une marque", "submit_label": "Créer"},
+    )
+
+
+@login_required
+def dashboard_marque_edit(request, marque_id: int):
+    if not request.user.is_staff:
+        return redirect("accueil")
+
+    marque = get_object_or_404(Marque, id=marque_id)
+    if request.method == "POST":
+        form = MarqueManageForm(request.POST, request.FILES, instance=marque)
+        logo_file = request.FILES.get("logo")
+        if logo_file:
+            error = _validate_uploaded_image(logo_file)
+            if error:
+                form.add_error("logo", error)
+        if form.is_valid():
+            marque = form.save()
+            messages.success(request, f"Marque mise à jour: {marque.nom}")
+            return redirect("dashboard_marques")
+    else:
+        form = MarqueManageForm(instance=marque)
+
+    return render(
+        request,
+        "admin/marques_form.html",
+        {
+            "form": form,
+            "title": f"Modifier la marque — {marque.nom}",
+            "submit_label": "Enregistrer",
+            "marque": marque,
+        },
+    )
+
+
+@login_required
+def dashboard_marque_delete(request, marque_id: int):
+    if not request.user.is_staff:
+        return redirect("accueil")
+
+    marque = get_object_or_404(Marque, id=marque_id)
+    modele_count = marque.modeles.count()
+    voiture_count = Voiture.objects.filter(modele__marque=marque).count()
+
+    if request.method == "POST":
+        name = marque.nom
+        marque.delete()
+        messages.info(request, f"Marque supprimée: {name}")
+        return redirect("dashboard_marques")
+
+    return render(
+        request,
+        "admin/marques_confirm_delete.html",
+        {"marque": marque, "modele_count": modele_count, "voiture_count": voiture_count},
+    )
 
 
 @login_required

@@ -47,6 +47,10 @@
             <a class="nav-link {% if request.resolver_match.url_name == 'liste_voitures' %}active{% endif %}"
                href="{% url 'liste_voitures' %}">Explorer</a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'liste_marques' %}active{% endif %}"
+               href="{% url 'liste_marques' %}">Marques</a>
+          </li>
           {% if user.is_staff %}
           <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
@@ -158,6 +162,7 @@
           <ul class="list-unstyled vstack gap-2 mb-0">
             <li><a class="am-footer-link" href="{% url 'accueil' %}">Accueil</a></li>
             <li><a class="am-footer-link" href="{% url 'liste_voitures' %}">Explorer</a></li>
+            <li><a class="am-footer-link" href="{% url 'liste_marques' %}">Marques</a></li>
             {% if user.is_staff %}
               <li><a class="am-footer-link" href="{% url 'dashboard' %}">Dashboard</a></li>
             {% endif %}
