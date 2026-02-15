@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Flotte & Disponibilités{% endblock %}
+{% block main_class %}container py-4{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-1">Gestion de flotte</h1>
+    <p class="am-muted mb-0">Disponibilité en temps réel, locations actives et réservations.</p>
+  </div>
+  <div class="small am-muted">Actualisation automatique</div>
+</div>
+
+<div class="am-card overflow-hidden">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <div class="fw-semibold">Véhicules</div>
+    <div class="small am-muted">Double-cliquez pour ouvrir l'annonce</div>
+  </div>
+  <div class="table-responsive" data-fleet-table data-status-url="{% url 'api_flotte_status' %}">
+    <table class="table align-middle mb-0" id="fleetTable">
+      <thead class="table-light">
+        <tr>
+          <th>Voiture</th>
+          <th>Statut</th>
+          <th>Créneau</th>
+          <th>Kilométrage</th>
+          <th>Carburant</th>
+          <th>Localisation</th>
+          <th>GPS</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in voitures %}
+          <tr data-id="{{ v.id }}" ondblclick="window.location='{% url 'detail_voiture' v.id %}'">
+            <td>
+              <div class="fw-semibold">{{ v.modele.marque.nom }} {{ v.modele.nom }}</div>
+              <div class="small am-muted">#{{ v.id }}</div>
+            </td>
+            <td data-col="statut"><span class="badge text-bg-light">—</span></td>
+            <td data-col="slot" class="small am-muted">—</td>
+            <td>{{ v.kilometrage|floatformat:0 }} km</td>
+            <td>{{ v.carburant_niveau }}%</td>
+            <td>{{ v.localisation }}</td>
+            <td>
+              {% if v.gps_tracking_url %}
+                <a class="btn btn-sm btn-outline-secondary" href="{{ v.gps_tracking_url }}" target="_blank">Tracker</a>
+              {% else %}
+                <span class="text-muted">N/A</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="text-center py-4">Aucun véhicule</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

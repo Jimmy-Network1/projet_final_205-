@@ -52,6 +52,10 @@
             <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
                href="{% url 'dashboard' %}">Dashboard</a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'flotte' %}active{% endif %}"
+               href="{% url 'flotte' %}">Flotte</a>
+          </li>
           {% endif %}
         </ul>
 

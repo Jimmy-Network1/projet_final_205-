@@ -10,7 +10,7 @@ from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
-from datetime import date
+from datetime import date, datetime
 import os
 from decimal import Decimal, InvalidOperation
 from .models import (
@@ -24,10 +24,12 @@ from .models import (
     Notification,
     ImageVoiture,
     Reservation,
+    Location,
 )
 from .forms import InscriptionForm, AvisForm
 from .services import transactions
 from .services import reservations as res_service
+from .services import locations as loc_service
 
 
 def _validate_uploaded_image(uploaded_file):
@@ -192,7 +194,9 @@ def detail_voiture(request, voiture_id):
         modele__marque=voiture.modele.marque,
         est_vendue=False
     ).exclude(id=voiture.id)[:4]
-    
+
+    loc_status = loc_service.current_status(voiture)
+
     context = {
         'voiture': voiture,
         'est_favori': est_favori,
@@ -201,6 +205,7 @@ def detail_voiture(request, voiture_id):
         'avis_form': AvisForm(),
         "transaction_en_attente": transaction_en_attente,
         "reservations": voiture.reservations.all()[:10],
+        "loc_status": loc_status,
     }
     return render(request, 'voitures/detail_voiture.html', context)
 
@@ -601,6 +606,54 @@ def notifications(request):
     items = Notification.objects.filter(utilisateur=request.user).order_by("-date_creation")[:200]
     Notification.objects.filter(utilisateur=request.user, lu=False).update(lu=True)
     return render(request, "voitures/notifications.html", {"items": items})
+
+
+@login_required
+def flotte(request):
+    """Vue staff : disponibilité de la flotte en quasi temps réel."""
+    if not request.user.is_staff:
+        return redirect("accueil")
+
+    loc_service.expire_finished_locations()
+    loc_service.start_due_locations()
+
+    voitures = Voiture.objects.select_related("modele__marque", "vendeur").all().order_by("-date_ajout")
+    return render(request, "voitures/flotte.html", {"voitures": voitures})
+
+
+@login_required
+def api_flotte_status(request):
+    if not request.user.is_staff:
+        return JsonResponse({"ok": False, "error": "Non autorisé"}, status=403)
+
+    loc_service.expire_finished_locations()
+    loc_service.start_due_locations()
+
+    now = timezone.now()
+    items = []
+    for v in Voiture.objects.select_related("modele__marque"):
+        status = loc_service.current_status(v)
+        badge = "success"
+        label = "Disponible"
+        creneau = ""
+        if status["en_cours"]:
+            badge, label = "danger", f"En location"
+            creneau = f"Jusqu'au {status['en_cours'].fin.strftime('%d/%m %H:%M')}"
+        elif status["prochaine"]:
+            badge, label = "warning", "Réservée"
+            creneau = f"Le {status['prochaine'].debut.strftime('%d/%m %H:%M')}"
+        elif v.est_reservee:
+            badge, label = "warning", "Réservée"
+        items.append(
+            {
+                "id": v.id,
+                "statut": status["etat"],
+                "statut_label": label,
+                "badge": badge,
+                "creneau": creneau,
+            }
+        )
+    return JsonResponse({"ok": True, "items": items})
 
 @login_required
 def acheter_voiture(request, voiture_id):

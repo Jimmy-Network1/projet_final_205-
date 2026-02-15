@@ -102,17 +102,23 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        default=None,
         conn_max_age=600,
         conn_health_checks=True,
     )
 }
-REQUIRE_POSTGRES = _env_bool("REQUIRE_POSTGRES", default=False)
-if REQUIRE_POSTGRES and "sqlite3" in DATABASES["default"]["ENGINE"]:
+REQUIRE_POSTGRES = _env_bool("REQUIRE_POSTGRES", default=True)
+if not DATABASES["default"]:
     from django.core.exceptions import ImproperlyConfigured
 
     raise ImproperlyConfigured(
-        "PostgreSQL requis: définissez DATABASE_URL vers une base Postgres (ex: postgres://...)."
+        "DATABASE_URL manquant. Configurez une URL Postgres (ex: postgres://user:pass@host:5432/dbname)."
+    )
+if "sqlite3" in DATABASES["default"]["ENGINE"]:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "SQLite désactivé. Utilisez Postgres via DATABASE_URL."
     )
 
 AUTH_PASSWORD_VALIDATORS = [

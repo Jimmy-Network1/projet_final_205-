@@ -287,6 +287,49 @@ class Reservation(models.Model):
             fin__gt=start,
         ).exists()
 
+
+class Location(models.Model):
+    STATUTS = [
+        ("a_venir", "À venir"),
+        ("en_cours", "En cours"),
+        ("terminee", "Terminée"),
+        ("annulee", "Annulée"),
+    ]
+
+    voiture = models.ForeignKey(Voiture, on_delete=models.CASCADE, related_name="locations")
+    client = models.ForeignKey(User, on_delete=models.CASCADE, related_name="locations")
+    debut = models.DateTimeField()
+    fin = models.DateTimeField()
+    statut = models.CharField(max_length=20, choices=STATUTS, default="a_venir")
+    kilometrage_depart = models.PositiveIntegerField(null=True, blank=True)
+    carburant_depart = models.PositiveSmallIntegerField(null=True, blank=True)
+    kilometrage_retour = models.PositiveIntegerField(null=True, blank=True)
+    carburant_retour = models.PositiveSmallIntegerField(null=True, blank=True)
+    prix_total = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    conditions = models.TextField(blank=True)
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_mise_a_jour = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date_creation"]
+        verbose_name = "Location"
+        verbose_name_plural = "Locations"
+        indexes = [
+            models.Index(fields=["voiture", "statut", "debut", "fin"]),
+        ]
+
+    def __str__(self):
+        return f"Location #{self.id} - {self.voiture}"
+
+    @staticmethod
+    def overlaps(voiture_id: int, start: datetime, end: datetime) -> bool:
+        return Location.objects.filter(
+            voiture_id=voiture_id,
+            statut__in=["a_venir", "en_cours"],
+            debut__lt=end,
+            fin__gt=start,
+        ).exists()
+
 class Message(models.Model):
     expediteur = models.ForeignKey(User, on_delete=models.CASCADE, related_name='messages_envoyes')
     destinataire = models.ForeignKey(User, on_delete=models.CASCADE, related_name='messages_recus')

@@ -48,6 +48,14 @@ python manage.py migrate
 python manage.py runserver 127.0.0.1:8000
 ```
 
+### Accès web à la base (pgAdmin)
+Le `docker compose` inclut pgAdmin :
+
+- Lancer : `docker compose -f ops/compose.yml up -d pgadmin`
+- Ouvrir : http://localhost:5050
+- Connexion : email `admin@local.test`, mot de passe `admin123`
+- Ajouter un serveur : hôte `db`, port `5432`, utilisateur `vente_voitures_user`, mot de passe `vente_voitures_password`, base `vente_voitures`.
+
 ## Données de démo / comptes
 Pour générer des comptes et des données de démo :
 ```bash

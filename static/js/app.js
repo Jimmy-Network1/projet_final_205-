@@ -268,3 +268,34 @@ document.addEventListener("submit", async (event) => {
     if (submitBtn) submitBtn.disabled = false;
   }
 });
+
+// Polling de disponibilité flotte
+document.addEventListener("DOMContentLoaded", () => {
+  const tableWrapper = document.querySelector("[data-fleet-table]");
+  if (!tableWrapper) return;
+  const url = tableWrapper.getAttribute("data-status-url");
+  if (!url) return;
+
+  const refresh = async () => {
+    try {
+      const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      const data = await res.json();
+      if (!data || !Array.isArray(data.items)) return;
+      data.items.forEach((item) => {
+        const row = tableWrapper.querySelector(`tr[data-id="${item.id}"]`);
+        if (!row) return;
+        const statutCell = row.querySelector("[data-col='statut']");
+        const slotCell = row.querySelector("[data-col='slot']");
+        if (statutCell) {
+          statutCell.innerHTML = `<span class="badge text-bg-${item.badge}">${item.statut_label}</span>`;
+        }
+        if (slotCell) {
+          slotCell.textContent = item.creneau || "—";
+        }
+      });
+    } catch (_) {}
+  };
+
+  refresh();
+  setInterval(refresh, 15000);
+});

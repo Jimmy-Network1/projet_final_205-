@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from .models import (
     Marque, Modele, Voiture, ImageVoiture, 
-    Favori, Avis, Transaction, Message, Notification
+    Favori, Avis, Transaction, Message, Notification, Location
 )
 
 class ImageVoitureInline(admin.TabularInline):
@@ -42,9 +42,9 @@ class ModeleAdmin(admin.ModelAdmin):
 
 @admin.register(Voiture)
 class VoitureAdmin(admin.ModelAdmin):
-    list_display = ['id', 'modele', 'annee', 'get_prix_format', 'vendeur', 'est_vendue', 'date_ajout']
-    list_filter = ['est_vendue', 'etat', 'couleur', 'modele__marque', 'date_ajout']
-    search_fields = ['modele__nom', 'modele__marque__nom', 'vendeur__username', 'description']
+    list_display = ['id', 'modele', 'annee', 'get_prix_format', 'vendeur', 'est_vendue', 'est_louee', 'est_reservee', 'date_ajout']
+    list_filter = ['est_vendue', 'est_louee', 'etat', 'couleur', 'modele__marque', 'date_ajout']
+    search_fields = ['modele__nom', 'modele__marque__nom', 'vendeur__username', 'description', 'localisation']
     readonly_fields = ['date_ajout', 'date_modification', 'vue', 'get_prix_format', 'get_age', 'get_est_recente']
     inlines = [ImageVoitureInline]
     list_per_page = 20
@@ -60,7 +60,7 @@ class VoitureAdmin(admin.ModelAdmin):
             'fields': ('image_principale',)
         }),
         ('Statut', {
-            'fields': ('est_vendue',)
+            'fields': ('est_vendue', 'est_reservee', 'est_louee', 'localisation', 'carburant_niveau', 'gps_tracking_url')
         }),
         ('Statistiques', {
             'fields': ('vue', 'date_ajout', 'date_modification', 'get_age', 'get_est_recente'),
@@ -164,3 +164,11 @@ class NotificationAdmin(admin.ModelAdmin):
     list_filter = ["type", "lu", "date_creation"]
     search_fields = ["utilisateur__username", "titre", "contenu"]
     readonly_fields = ["date_creation"]
+
+
+@admin.register(Location)
+class LocationAdmin(admin.ModelAdmin):
+    list_display = ["id", "voiture", "client", "statut", "debut", "fin", "prix_total"]
+    list_filter = ["statut", "debut", "fin"]
+    search_fields = ["voiture__modele__nom", "client__username"]
+    readonly_fields = ["date_creation", "date_mise_a_jour"]
