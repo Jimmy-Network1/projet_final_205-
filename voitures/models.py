@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 import os
+from datetime import datetime
 
 class Marque(models.Model):
     nom = models.CharField(max_length=100, unique=True)
@@ -235,6 +236,52 @@ class Transaction(models.Model):
             'terminee': 'Terminée',
         }
         return statuts.get(self.statut, self.statut)
+
+
+class Reservation(models.Model):
+    STATUTS = [
+        ("en_attente", "En attente"),
+        ("acceptee", "Acceptée"),
+        ("refusee", "Refusée"),
+        ("annulee", "Annulée"),
+        ("terminee", "Terminée"),
+    ]
+
+    TYPE_CHOICES = [
+        ("reservation", "Réservation véhicule"),
+        ("essai", "Essai"),
+    ]
+
+    voiture = models.ForeignKey(Voiture, on_delete=models.CASCADE, related_name="reservations")
+    client = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reservations")
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default="reservation")
+    debut = models.DateTimeField()
+    fin = models.DateTimeField()
+    statut = models.CharField(max_length=20, choices=STATUTS, default="en_attente")
+    note = models.TextField(blank=True)
+    signature = models.TextField(blank=True)
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_creation"]
+        verbose_name = "Réservation"
+        verbose_name_plural = "Réservations"
+
+    def __str__(self):
+        return f"Reservation #{self.id} - {self.voiture}"
+
+    @property
+    def is_active(self):
+        return self.statut in {"en_attente", "acceptee"} and self.fin > timezone.now()
+
+    @staticmethod
+    def overlaps(voiture_id: int, start: datetime, end: datetime) -> bool:
+        return Reservation.objects.filter(
+            voiture_id=voiture_id,
+            statut__in=["en_attente", "acceptee"],
+            debut__lt=end,
+            fin__gt=start,
+        ).exists()
 
 class Message(models.Model):
     expediteur = models.ForeignKey(User, on_delete=models.CASCADE, related_name='messages_envoyes')

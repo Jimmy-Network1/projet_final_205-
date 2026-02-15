@@ -12,6 +12,7 @@ urlpatterns = [
     path('voiture/<int:voiture_id>/supprimer/', views.supprimer_voiture, name='supprimer_voiture'),  # AJOUTÉ
     path('voiture/<int:voiture_id>/favori/', views.toggle_favori, name='toggle_favori'),
     path('voiture/<int:voiture_id>/acheter/', views.acheter_voiture, name='acheter_voiture'),
+    path('voiture/<int:voiture_id>/reserver/', views.reserver_voiture, name='reserver_voiture'),
     path('voiture/<int:voiture_id>/avis/', views.ajouter_avis, name='ajouter_avis'),
     path('voiture/<int:voiture_id>/message/', views.envoyer_message, name='envoyer_message'),
     

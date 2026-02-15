@@ -16,6 +16,7 @@ from decimal import Decimal, InvalidOperation
 from .models import Marque, Modele, Voiture, Favori, Transaction, Avis, Message, Notification, ImageVoiture
 from .forms import InscriptionForm, AvisForm
 from .services import transactions
+from .services import reservations as res_service
 
 
 def _validate_uploaded_image(uploaded_file):
@@ -147,6 +148,8 @@ def liste_voitures(request):
 def detail_voiture(request, voiture_id):
     """Page de détails d'une voiture"""
     transactions.expire_stale_purchase_requests()
+    res_service.expire_stale_pending()
+    res_service.expire_finished_reservations()
     voiture = get_object_or_404(
         Voiture.objects.select_related('modele__marque', 'vendeur').prefetch_related("images"),
         id=voiture_id,
@@ -186,6 +189,7 @@ def detail_voiture(request, voiture_id):
         'voitures_similaires': voitures_similaires,
         'avis_form': AvisForm(),
         "transaction_en_attente": transaction_en_attente,
+        "reservations": voiture.reservations.all()[:10],
     }
     return render(request, 'voitures/detail_voiture.html', context)
 
@@ -588,6 +592,10 @@ def acheter_voiture(request, voiture_id):
     
     if request.user == voiture.vendeur:
         messages.error(request, 'Vous ne pouvez pas acheter votre propre voiture.')
+        return redirect('detail_voiture', voiture_id=voiture_id)
+
+    if voiture.est_reservee and not voiture.transactions.filter(statut="en_attente").exists():
+        messages.info(request, "Cette voiture est réservée pour un essai. Réessayez plus tard.")
         return redirect('detail_voiture', voiture_id=voiture_id)
 
     if voiture.est_reservee:
