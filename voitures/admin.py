@@ -111,6 +111,33 @@ class VoitureAdmin(admin.ModelAdmin):
         return "N/A"
     get_est_recente.short_description = 'Récente'
 
+    def save_model(self, request, obj, form, change):
+        previous_status = None
+        if change and obj.pk:
+            previous_status = (
+                Voiture.objects.filter(pk=obj.pk).values_list("moderation_status", flat=True).first()
+            )
+
+        super().save_model(request, obj, form, change)
+
+        if previous_status != obj.moderation_status:
+            if obj.moderation_status in {"approved", "rejected"}:
+                Voiture.objects.filter(pk=obj.pk).update(moderated_at=timezone.now())
+                if obj.vendeur and obj.vendeur.is_active:
+                    Notification.objects.create(
+                        utilisateur=obj.vendeur,
+                        type="listing_moderation",
+                        titre="Annonce approuvée" if obj.moderation_status == "approved" else "Annonce refusée",
+                        contenu=(
+                            f"Votre annonce #{obj.id} est maintenant visible."
+                            if obj.moderation_status == "approved"
+                            else f"Votre annonce #{obj.id} a été refusée. Modifiez-la puis renvoyez-la."
+                        ),
+                        url=obj.get_absolute_url(),
+                    )
+            elif obj.moderation_status == "pending":
+                Voiture.objects.filter(pk=obj.pk).update(moderated_at=None)
+
     @admin.action(description="Approuver les annonces sélectionnées")
     def approve_listings(self, request, queryset):
         now = timezone.now()
