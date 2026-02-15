@@ -1,0 +1,14 @@
+2026-02-15 14:58:55.963 WAT [88982] LOG:  starting PostgreSQL 18.1 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 15.2.1 20251112, 64-bit
+2026-02-15 14:58:55.964 WAT [88982] LOG:  could not create IPv6 socket for address "::1": Operation not permitted
+2026-02-15 14:58:55.964 WAT [88982] LOG:  could not create IPv4 socket for address "127.0.0.1": Operation not permitted
+2026-02-15 14:58:55.964 WAT [88982] WARNING:  could not create listen socket for "localhost"
+2026-02-15 14:58:55.965 WAT [88982] FATAL:  could not create any TCP/IP sockets
+2026-02-15 14:58:55.967 WAT [88982] LOG:  database system is shut down
+2026-02-15 14:59:06.474 WAT [89035] LOG:  starting PostgreSQL 18.1 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 15.2.1 20251112, 64-bit
+2026-02-15 14:59:06.474 WAT [89035] FATAL:  could not open lock file "/run/postgresql/.s.PGSQL.5432.lock": Permission denied
+2026-02-15 14:59:06.477 WAT [89035] LOG:  database system is shut down
+2026-02-15 14:59:19.600 WAT [89096] LOG:  starting PostgreSQL 18.1 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 15.2.1 20251112, 64-bit
+2026-02-15 14:59:19.603 WAT [89096] LOG:  could not bind Unix address "/home/faouz/Bureau/TP205/projet_final_205-/.pgdata/sockets/.s.PGSQL.5432": Operation not permitted
+2026-02-15 14:59:19.603 WAT [89096] WARNING:  could not create Unix-domain socket in directory "/home/faouz/Bureau/TP205/projet_final_205-/.pgdata/sockets"
+2026-02-15 14:59:19.603 WAT [89096] FATAL:  could not create any Unix-domain sockets
+2026-02-15 14:59:19.607 WAT [89096] LOG:  database system is shut down
