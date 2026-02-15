@@ -25,9 +25,10 @@
         {% else %}
           <span class="badge text-bg-success position-absolute top-0 start-0 m-3">Disponible</span>
         {% endif %}
-        <img class="am-img-cover" src="{{ voiture.image_principale.url }}"
+        <img class="am-img-cover am-img-skeleton js-lightbox" src="{{ voiture.image_principale.url }}"
              onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
-             alt="{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}">
+             alt="{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}"
+             data-image="{{ voiture.image_principale.url }}">
       </div>
       <div class="p-4">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
@@ -149,7 +150,7 @@
           <a class="text-decoration-none" href="{% url 'detail_voiture' v.id %}">
             <div class="am-card am-card-hover h-100 overflow-hidden">
               <div class="ratio ratio-16x9 bg-light">
-                <img class="am-img-cover" src="{{ v.image_principale.url }}"
+                <img class="am-img-cover am-img-skeleton" src="{{ v.image_principale.url }}"
                      onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
                      alt="{{ v.modele.marque.nom }} {{ v.modele.nom }}" loading="lazy">
               </div>
@@ -263,4 +264,32 @@
     </div>
   </aside>
 </div>
+
+<!-- Lightbox modal -->
+<div class="modal fade" id="photoModal" tabindex="-1" aria-labelledby="photoModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content bg-dark">
+      <div class="modal-body p-0">
+        <img id="photoModalImg" src="" alt="Photo voiture" class="w-100">
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+  document.addEventListener("click", (event) => {
+    const img = event.target.closest(".js-lightbox");
+    if (!img) return;
+    const src = img.getAttribute("data-image") || img.getAttribute("src");
+    const modalImg = document.getElementById("photoModalImg");
+    if (modalImg && src) {
+      modalImg.src = src;
+      const modal = new bootstrap.Modal(document.getElementById("photoModal"));
+      modal.show();
+    }
+  });
+</script>
+{% endblock %}
 {% endblock %}

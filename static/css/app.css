@@ -170,6 +170,31 @@ body {
   background: var(--am-border);
 }
 
+.am-pill-btn {
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+}
+
+.am-form-hint {
+  color: var(--am-muted);
+  font-size: 0.9rem;
+}
+
+.am-img-skeleton {
+  background: linear-gradient(90deg, #e2e8f0, #f1f5f9, #e2e8f0);
+  background-size: 200% 100%;
+  animation: skeleton 1.4s ease infinite;
+}
+
+.am-form-hint span + span {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes skeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 .am-icon-pill {
   display: inline-flex;
   align-items: center;

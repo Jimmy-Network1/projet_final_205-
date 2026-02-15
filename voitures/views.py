@@ -9,6 +9,8 @@ from django.core.paginator import Paginator
 from django.http import HttpResponse
 from django.views.decorators.http import require_POST
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils import timezone
+from datetime import date
 import os
 from decimal import Decimal, InvalidOperation
 from .models import Marque, Modele, Voiture, Favori, Transaction, Avis, Message, Notification
@@ -248,7 +250,10 @@ def ajouter_voiture(request):
     if request.method == 'POST':
         try:
             # Récupération des données du formulaire
-            marque_id = request.POST.get('marque')
+            marque_choice = request.POST.get('marque')
+            new_marque_nom = (request.POST.get("new_marque_nom") or "").strip()
+            new_marque_pays = (request.POST.get("new_marque_pays") or "Non spécifié").strip() or "Non spécifié"
+            new_marque_date_raw = (request.POST.get("new_marque_date") or "").strip()
             modele_nom = (request.POST.get('modele') or "").strip()
             prix_raw = request.POST.get('prix')
             kilometrage_raw = request.POST.get('kilometrage')
@@ -261,8 +266,8 @@ def ajouter_voiture(request):
             puissance_raw = request.POST.get("puissance")
             consommation_raw = request.POST.get("consommation")
 
-            if not (marque_id and modele_nom and prix_raw and kilometrage_raw and annee_raw and couleur and etat and description):
-                messages.error(request, "Veuillez remplir tous les champs obligatoires.")
+            if not ((marque_choice or new_marque_nom) and modele_nom and prix_raw and kilometrage_raw and annee_raw and couleur and etat and description):
+                messages.error(request, "Veuillez remplir tous les champs obligatoires (dont marque et modèle).")
                 return redirect("ajouter_voiture")
 
             try:
@@ -300,7 +305,25 @@ def ajouter_voiture(request):
                 consommation = 6.0
             
             # Création ou récupération de la marque et du modèle
-            marque = get_object_or_404(Marque, id=marque_id)
+            if marque_choice == "__new__":
+                if not new_marque_nom:
+                    messages.error(request, "Indiquez le nom de la nouvelle marque.")
+                    return redirect("ajouter_voiture")
+                try:
+                    parsed_date = date.fromisoformat(new_marque_date_raw) if new_marque_date_raw else timezone.now().date()
+                except ValueError:
+                    parsed_date = timezone.now().date()
+                marque, _created = Marque.objects.get_or_create(
+                    nom=new_marque_nom,
+                    defaults={
+                        "pays": new_marque_pays or "Non spécifié",
+                        "date_creation": parsed_date,
+                        "description": "",
+                    },
+                )
+            else:
+                marque = get_object_or_404(Marque, id=marque_choice)
+
             modele, created = Modele.objects.get_or_create(
                 marque=marque,
                 nom=modele_nom,
@@ -312,9 +335,6 @@ def ajouter_voiture(request):
                     'consommation': consommation,
                 }
             )
-            if not created:
-                # On conserve la fiche modèle existante pour rester cohérent (nom unique par marque).
-                pass
             
             # Création de la voiture
             voiture = Voiture.objects.create(
