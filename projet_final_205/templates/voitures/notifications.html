@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Notifications - AutoMarket{% endblock %}
+{% block main_class %}container py-4{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-1">Notifications</h1>
+    <p class="am-muted mb-0">Achats, publications et messages.</p>
+  </div>
+</div>
+
+<div class="am-card overflow-hidden">
+  <div class="p-3 p-md-4 border-bottom">
+    <div class="fw-semibold">Historique</div>
+  </div>
+
+  {% if items %}
+    <div class="list-group list-group-flush">
+      {% for n in items %}
+        <div class="list-group-item">
+          <div class="d-flex justify-content-between gap-2">
+            <div>
+              <div class="fw-semibold">{{ n.titre }}</div>
+              {% if n.contenu %}<div class="small am-muted">{{ n.contenu }}</div>{% endif %}
+            </div>
+            <div class="text-nowrap small am-muted">{{ n.date_creation|date:"d/m/Y H:i" }}</div>
+          </div>
+          {% if n.url %}
+            <div class="mt-2">
+              <a class="btn btn-sm btn-outline-secondary" href="{{ n.url }}">Ouvrir</a>
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="p-4">
+      <div class="alert alert-info mb-0">Aucune notification.</div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+

@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% load currency %}
+
+{% block title %}Mes ventes - AutoMarket{% endblock %}
+{% block main_class %}container py-4{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-1">Mes ventes</h1>
+    <p class="am-muted mb-0">Confirmez les demandes en attente et suivez l'historique.</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'mes_voitures' %}">Mes annonces</a>
+</div>
+
+<div class="am-card overflow-hidden">
+  <div class="p-3 p-md-4 border-bottom">
+    <div class="fw-semibold">Transactions</div>
+  </div>
+
+  {% if ventes %}
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Voiture</th>
+            <th class="text-nowrap">Prix</th>
+            <th class="text-nowrap">Acheteur</th>
+            <th class="text-nowrap">Statut</th>
+            <th class="text-nowrap">Date</th>
+            <th class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in ventes %}
+            <tr>
+              <td>
+                <span class="fw-semibold">{{ t.voiture.modele.marque.nom }} {{ t.voiture.modele.nom }}</span>
+                <div class="small am-muted">{{ t.voiture.annee }} • {{ t.voiture.kilometrage|floatformat:0 }} km</div>
+              </td>
+              <td class="fw-semibold text-primary am-price">{{ t.prix_final|fcfa }}</td>
+              <td>{{ t.acheteur.username }}</td>
+              <td>
+                {% if t.statut == 'en_attente' %}
+                  <span class="badge text-bg-warning">En attente</span>
+                {% elif t.statut == 'confirmee' %}
+                  <span class="badge text-bg-success">Confirmée</span>
+                {% elif t.statut == 'annulee' %}
+                  <span class="badge text-bg-danger">Annulée</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">{{ t.get_statut_display_fr }}</span>
+                {% endif %}
+              </td>
+              <td class="text-nowrap">{{ t.date_transaction|date:"d/m/Y H:i" }}</td>
+              <td class="text-end">
+                {% if t.statut == 'en_attente' %}
+                  <form method="post" action="{% url 'confirmer_vente' t.id %}">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-success" type="submit">Confirmer</button>
+                  </form>
+                {% else %}
+                  <span class="small am-muted">—</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="p-4">
+      <div class="alert alert-info mb-0">Aucune vente pour le moment.</div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load currency %}
+
+{% block title %}Favoris - AutoMarket{% endblock %}
+{% block main_class %}container py-4{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-1">Mes favoris</h1>
+    <p class="am-muted mb-0">Retrouvez les annonces que vous avez enregistrées.</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'liste_voitures' %}">Explorer</a>
+</div>
+
+{% if favoris %}
+  <div class="row g-3">
+    {% for f in favoris %}
+      <div class="col-md-6 col-lg-4">
+        <div class="am-card am-card-hover h-100 overflow-hidden">
+          <div class="ratio ratio-16x9 bg-light">
+            <img class="am-img-cover" src="{{ f.voiture.image_principale.url }}"
+                 onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
+                 alt="{{ f.voiture.modele.marque.nom }} {{ f.voiture.modele.nom }}" loading="lazy">
+          </div>
+          <div class="p-3">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div>
+                <div class="fw-semibold">{{ f.voiture.modele.marque.nom }} {{ f.voiture.modele.nom }}</div>
+                <div class="small am-muted">{{ f.voiture.annee }} • {{ f.voiture.kilometrage|floatformat:0 }} km</div>
+              </div>
+              <div class="fw-semibold text-primary am-price">{{ f.voiture.prix|fcfa }}</div>
+            </div>
+            <div class="d-grid gap-2 mt-3">
+              <a class="btn btn-outline-primary" href="{% url 'detail_voiture' f.voiture.id %}">Voir l'annonce</a>
+              <form method="post" action="{% url 'toggle_favori' f.voiture.id %}">
+                {% csrf_token %}
+                <button class="btn btn-outline-danger w-100" type="submit">
+                  <i class="fa-solid fa-heart-crack me-2"></i> Retirer
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="alert alert-info mb-0">Aucun favori pour le moment.</div>
+{% endif %}
+{% endblock %}

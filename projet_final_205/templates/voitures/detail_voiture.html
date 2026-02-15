@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load currency %}
+
+{% block title %}{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }} - AutoMarket{% endblock %}
+{% block main_class %}container py-4{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a class="text-decoration-none" href="{% url 'accueil' %}">Accueil</a></li>
+    <li class="breadcrumb-item"><a class="text-decoration-none" href="{% url 'liste_voitures' %}">Explorer</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}</li>
+  </ol>
+</nav>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="am-card overflow-hidden mb-4">
+      <div class="ratio ratio-16x9 bg-light position-relative">
+        {% if voiture.est_vendue %}
+          <span class="badge text-bg-danger position-absolute top-0 start-0 m-3">Vendue</span>
+        {% elif voiture.est_reservee %}
+          <span class="badge text-bg-warning position-absolute top-0 start-0 m-3">Réservée</span>
+        {% else %}
+          <span class="badge text-bg-success position-absolute top-0 start-0 m-3">Disponible</span>
+        {% endif %}
+        <img class="am-img-cover" src="{{ voiture.image_principale.url }}"
+             onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
+             alt="{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}">
+      </div>
+      <div class="p-4">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+          <div>
+            <h1 class="h3 mb-1">{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}</h1>
+            <div class="am-muted">{{ voiture.annee }} • {{ voiture.kilometrage|floatformat:0 }} km • {{ voiture.get_couleur_display }}</div>
+          </div>
+          <div class="text-lg-end">
+          <div class="h3 mb-0 text-primary am-price">{{ voiture.prix|fcfa }}</div>
+            <div class="small am-muted">Prix affiché</div>
+          </div>
+        </div>
+
+        <div class="am-divider my-4"></div>
+
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="am-kpi p-3 h-100">
+              <div class="small am-muted">État</div>
+              <div class="fw-semibold">{{ voiture.get_etat_display }}</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="am-kpi p-3 h-100">
+              <div class="small am-muted">Carburant</div>
+              <div class="fw-semibold">{{ voiture.modele.get_type_carburant_display }}</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="am-kpi p-3 h-100">
+              <div class="small am-muted">Transmission</div>
+              <div class="fw-semibold">{{ voiture.modele.get_transmission_display }}</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="am-kpi p-3 h-100">
+              <div class="small am-muted">Puissance</div>
+              <div class="fw-semibold">{{ voiture.modele.puissance }} ch</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="am-kpi p-3 h-100">
+              <div class="small am-muted">Conso</div>
+              <div class="fw-semibold">{{ voiture.modele.consommation }} L/100</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="am-kpi p-3 h-100">
+              <div class="small am-muted">Vendeur</div>
+              <div class="fw-semibold">{{ voiture.vendeur.username }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="am-divider my-4"></div>
+
+        <h2 class="h5 mb-2">Description</h2>
+        <p class="mb-0">{{ voiture.description }}</p>
+      </div>
+    </div>
+
+    <div class="am-card p-4 mb-4">
+      <div class="d-flex align-items-end justify-content-between gap-3 mb-3">
+        <div>
+          <h2 class="h5 mb-1">Avis</h2>
+          <p class="am-muted mb-0">Les avis approuvés sur ce véhicule.</p>
+        </div>
+      </div>
+
+      {% if user.is_authenticated and user != voiture.vendeur %}
+        <form class="mb-4" method="post" action="{% url 'ajouter_avis' voiture.id %}">
+          {% csrf_token %}
+          <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+              <label class="form-label" for="{{ avis_form.note.id_for_label }}">Note</label>
+              {{ avis_form.note }}
+            </div>
+            <div class="col-md-9">
+              <label class="form-label" for="{{ avis_form.commentaire.id_for_label }}">Commentaire</label>
+              {{ avis_form.commentaire }}
+            </div>
+          </div>
+          <button class="btn btn-outline-primary mt-2" type="submit">Envoyer mon avis</button>
+          <div class="small am-muted mt-1">Votre avis sera visible après validation.</div>
+        </form>
+      {% endif %}
+
+      {% if avis %}
+        <div class="vstack gap-3">
+          {% for a in avis %}
+            <div class="p-3 border rounded-3">
+              <div class="d-flex align-items-start justify-content-between gap-2">
+                <div class="fw-semibold">{{ a.utilisateur.username }}</div>
+                <div class="text-warning">
+                  {% for i in "12345" %}
+                    {% if forloop.counter <= a.note %}<i class="fa-solid fa-star"></i>{% else %}<i class="fa-regular fa-star"></i>{% endif %}
+                  {% endfor %}
+                </div>
+              </div>
+              <div class="small am-muted">{{ a.date_publication|date:"d/m/Y" }}</div>
+              <div class="mt-2">{{ a.commentaire }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="alert alert-light border mb-0">Aucun avis pour le moment.</div>
+      {% endif %}
+    </div>
+
+    <div class="mb-2 d-flex align-items-end justify-content-between gap-3">
+      <div>
+        <h2 class="h5 mb-1">Annonces similaires</h2>
+        <p class="am-muted mb-0">Même marque, autres modèles disponibles.</p>
+      </div>
+    </div>
+    <div class="row g-3">
+      {% for v in voitures_similaires %}
+        <div class="col-md-6 col-xl-3">
+          <a class="text-decoration-none" href="{% url 'detail_voiture' v.id %}">
+            <div class="am-card am-card-hover h-100 overflow-hidden">
+              <div class="ratio ratio-16x9 bg-light">
+                <img class="am-img-cover" src="{{ v.image_principale.url }}"
+                     onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
+                     alt="{{ v.modele.marque.nom }} {{ v.modele.nom }}" loading="lazy">
+              </div>
+              <div class="p-3">
+                <div class="fw-semibold text-dark">{{ v.modele.nom }}</div>
+                <div class="small am-muted">{{ v.annee }} • {{ v.kilometrage|floatformat:0 }} km</div>
+                <div class="fw-semibold text-primary am-price mt-2">{{ v.prix|fcfa }}</div>
+              </div>
+            </div>
+          </a>
+        </div>
+      {% empty %}
+        <div class="col-12">
+          <div class="alert alert-light border mb-0">Aucune annonce similaire.</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <aside class="col-lg-4">
+    <div class="am-card p-4 position-sticky" style="top: 92px;">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="fw-semibold">Actions</div>
+        <span class="badge text-bg-light am-badge">#{{ voiture.id }}</span>
+      </div>
+
+      <div class="d-grid gap-2">
+        {% if user.is_authenticated and user != voiture.vendeur and not voiture.est_vendue and not voiture.est_reservee %}
+          <a class="btn btn-success btn-lg" href="{% url 'acheter_voiture' voiture.id %}">
+            <i class="fa-solid fa-cart-shopping me-2"></i> Acheter
+          </a>
+          <form method="post" action="{% url 'toggle_favori' voiture.id %}">
+            {% csrf_token %}
+            <button class="btn btn-outline-danger" type="submit">
+              {% if est_favori %}
+                <i class="fa-solid fa-heart me-2"></i> Retirer des favoris
+              {% else %}
+                <i class="fa-regular fa-heart me-2"></i> Ajouter aux favoris
+              {% endif %}
+            </button>
+          </form>
+        {% elif voiture.est_reservee and not voiture.est_vendue %}
+          <div class="alert alert-warning mb-0">Cette voiture est réservée (transaction en attente).</div>
+        {% elif user == voiture.vendeur %}
+          <a class="btn btn-primary btn-lg" href="{% url 'modifier_voiture' voiture.id %}">
+            <i class="fa-solid fa-pen-to-square me-2"></i> Modifier l'annonce
+          </a>
+          <a class="btn btn-outline-danger" href="{% url 'supprimer_voiture' voiture.id %}">
+            <i class="fa-solid fa-trash me-2"></i> Supprimer
+          </a>
+        {% endif %}
+
+        <a class="btn btn-outline-secondary" href="{% url 'liste_voitures' %}">
+          <i class="fa-solid fa-arrow-left me-2"></i> Retour à la liste
+        </a>
+      </div>
+
+      <div class="am-divider my-4"></div>
+
+      {% if user.is_authenticated and user != voiture.vendeur %}
+        <div class="mb-4">
+          <div class="small am-muted mb-2">Contacter le vendeur</div>
+          <form method="post" action="{% url 'envoyer_message' voiture.id %}">
+            {% csrf_token %}
+            <textarea class="form-control" name="contenu" rows="3" placeholder="Écrivez votre message..."></textarea>
+            <button class="btn btn-primary w-100 mt-2" type="submit">
+              <i class="fa-regular fa-paper-plane me-2"></i> Envoyer
+            </button>
+          </form>
+        </div>
+        <div class="am-divider my-4"></div>
+      {% endif %}
+
+      <div>
+        <div class="small am-muted mb-2">Partager</div>
+        <div class="input-group">
+          <input class="form-control" id="shareUrl" value="{{ request.build_absolute_uri }}" readonly>
+          <button class="btn btn-outline-secondary" type="button" data-copy-target="#shareUrl">Copier</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Créer un compte - AutoMarket{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="am-card am-form-card p-4 p-md-5">
+      <div class="d-flex align-items-start justify-content-between gap-3 mb-4">
+        <div>
+          <h1 class="h3 mb-1">Créer un compte</h1>
+          <p class="am-muted mb-0">Accédez aux favoris, publiez des annonces et suivez vos transactions.</p>
+        </div>
+        <div class="brand-mark"><i class="fa-solid fa-user-plus"></i></div>
+      </div>
+
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.first_name.id_for_label }}">Prénom</label>
+            {{ form.first_name }}
+            {% if form.first_name.errors %}<div class="invalid-feedback d-block">{{ form.first_name.errors|striptags }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.last_name.id_for_label }}">Nom</label>
+            {{ form.last_name }}
+            {% if form.last_name.errors %}<div class="invalid-feedback d-block">{{ form.last_name.errors|striptags }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.username.id_for_label }}">Nom d'utilisateur</label>
+            {{ form.username }}
+            {% if form.username.errors %}<div class="invalid-feedback d-block">{{ form.username.errors|striptags }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.email.id_for_label }}">Email</label>
+            {{ form.email }}
+            {% if form.email.errors %}<div class="invalid-feedback d-block">{{ form.email.errors|striptags }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.password1.id_for_label }}">Mot de passe</label>
+            {{ form.password1 }}
+            {% if form.password1.errors %}<div class="invalid-feedback d-block">{{ form.password1.errors|striptags }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.password2.id_for_label }}">Confirmation</label>
+            {{ form.password2 }}
+            {% if form.password2.errors %}<div class="invalid-feedback d-block">{{ form.password2.errors|striptags }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="d-grid gap-2 mt-4">
+          <button class="btn btn-primary btn-lg" type="submit">
+            <i class="fa-solid fa-check me-2"></i> Créer mon compte
+          </button>
+          <a class="btn btn-outline-secondary" href="{% url 'connexion' %}">
+            J'ai déjà un compte
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

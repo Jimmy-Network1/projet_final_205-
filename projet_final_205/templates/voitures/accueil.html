@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load currency %}
+
+{% block title %}Accueil - AutoMarket{% endblock %}
+{% block body_class %}home{% endblock %}
+{% block main_class %}p-0{% endblock %}
+
+{% block content %}
+<section class="home-hero" style="--home-hero-bg: url('{% static 'img/home-hero-bg.jpg' %}');">
+  <div class="container content py-5">
+    <div class="row align-items-center g-5">
+      <div class="col-lg-7">
+        <div class="hero-badges d-flex flex-wrap gap-2 mb-3 reveal-up">
+          <span class="badge rounded-pill px-3 py-2"><i class="fa-solid fa-shield-halved me-2"></i>Offres vérifiées</span>
+          <span class="badge rounded-pill px-3 py-2"><i class="fa-solid fa-magnifying-glass me-2"></i>Recherche rapide</span>
+          <span class="badge rounded-pill px-3 py-2"><i class="fa-regular fa-heart me-2"></i>Favoris</span>
+        </div>
+
+        <h1 class="display-4 fw-semibold text-white hero-title mb-3 reveal-up delay-1">
+          Trouvez votre prochaine voiture
+        </h1>
+        <p class="lead hero-subtitle mb-4 reveal-up delay-2">
+          Une expérience simple et premium: annonces claires, filtres rapides, favoris, et achat en ligne.
+        </p>
+
+        <div class="hero-actions d-flex flex-wrap gap-2 reveal-up delay-3">
+          <a class="btn btn-primary btn-lg" href="{% url 'liste_voitures' %}">
+            <i class="fa-solid fa-magnifying-glass me-2"></i> Explorer
+          </a>
+          {% if user.is_authenticated %}
+            <a class="btn btn-outline-light btn-lg" href="{% url 'ajouter_voiture' %}">
+              <i class="fa-solid fa-plus me-2"></i> Publier
+            </a>
+          {% else %}
+            <a class="btn btn-outline-light btn-lg" href="{% url 'inscription' %}">
+              Créer un compte
+            </a>
+          {% endif %}
+        </div>
+
+        <div class="hero-kpis p-3 p-md-4 mt-4 reveal-up delay-4">
+          <div class="row g-3">
+            <div class="col-4">
+              <div class="label small mb-1">Disponibles</div>
+              <div class="h4 mb-0 value">{{ total_voitures }}</div>
+            </div>
+            <div class="col-4">
+              <div class="label small mb-1">Marques</div>
+              <div class="h4 mb-0 value">{{ marques_populaires|length }}</div>
+            </div>
+            <div class="col-4">
+              <div class="label small mb-1">Nouveautés</div>
+              <div class="h4 mb-0 value">{{ voitures_recentes|length }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 reveal-up delay-4">
+          <div class="am-card am-form-card p-3 p-md-4" style="background: rgba(255,255,255,0.92);">
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+              <div class="fw-semibold">Recherche rapide</div>
+              <span class="small text-secondary">Trouver une voiture en 10s</span>
+            </div>
+            <form class="row g-2" method="get" action="{% url 'liste_voitures' %}">
+              <div class="col-md-5">
+                <label class="form-label small mb-1" for="hero_marque">Marque</label>
+                <select class="form-select" id="hero_marque" name="marque">
+                  <option value="">Toutes</option>
+                  {% for marque in marques %}
+                    <option value="{{ marque.id }}">{{ marque.nom }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-3 col-6">
+                <label class="form-label small mb-1" for="hero_prix_min">Prix min</label>
+                <input class="form-control" id="hero_prix_min" name="prix_min" type="number" min="0" placeholder="0">
+              </div>
+              <div class="col-md-3 col-6">
+                <label class="form-label small mb-1" for="hero_prix_max">Prix max</label>
+                <input class="form-control" id="hero_prix_max" name="prix_max" type="number" min="0" placeholder="30000">
+              </div>
+              <div class="col-md-1 d-grid">
+                <label class="form-label small mb-1 d-none d-md-block">&nbsp;</label>
+                <button class="btn btn-primary" type="submit" aria-label="Rechercher">
+                  <i class="fa-solid fa-arrow-right"></i>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="vstack gap-3">
+          <div class="float-card p-3 p-md-4 reveal-up delay-2">
+            <div class="d-flex align-items-center justify-content-between gap-3">
+              <div>
+                <div class="small text-secondary">Astuce</div>
+                <div class="fw-semibold">Utilisez les filtres pour aller plus vite</div>
+              </div>
+              <div class="brand-mark"><i class="fa-solid fa-sliders"></i></div>
+            </div>
+            <div class="small text-secondary mt-2">Marque, prix et année — tout est prêt.</div>
+          </div>
+
+          <div class="float-card p-3 p-md-4 delay-1 reveal-up delay-3">
+            <div class="d-flex align-items-center justify-content-between gap-3">
+              <div>
+                <div class="small text-secondary">Sécurité</div>
+                <div class="fw-semibold">Transactions suivies dans votre espace</div>
+              </div>
+              <div class="brand-mark"><i class="fa-solid fa-receipt"></i></div>
+            </div>
+            <div class="small text-secondary mt-2">Consultez achats et ventes à tout moment.</div>
+          </div>
+
+          <div class="float-card p-3 p-md-4 delay-2 reveal-up delay-4">
+            <div class="d-flex align-items-center justify-content-between gap-3">
+              <div>
+                <div class="small text-secondary">Visuel</div>
+                <div class="fw-semibold">De belles photos rendent une annonce pro</div>
+              </div>
+              <div class="brand-mark"><i class="fa-solid fa-camera"></i></div>
+            </div>
+            <div class="small text-secondary mt-2">Ajoutez 6 à 10 photos pour maximiser l’intérêt.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="container py-5">
+  <div class="d-flex align-items-end justify-content-between gap-3 mb-3">
+    <div>
+      <h2 class="h4 mb-1 home-section-title">À la une</h2>
+      <p class="am-muted mb-0">Toutes les voitures avec photos (dernières annonces).</p>
+    </div>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'liste_voitures' %}">Voir tout</a>
+  </div>
+
+  <div class="row g-3">
+    {% for voiture in voitures_vedette %}
+      <div class="col-md-6 col-lg-4 col-xl-3">
+        <div class="am-card am-card-hover h-100 overflow-hidden">
+          <div class="ratio ratio-16x9 bg-light">
+            <img class="am-img-cover" src="{{ voiture.image_principale.url }}"
+                 onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
+                 alt="{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}" loading="lazy">
+          </div>
+          <div class="p-3">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div>
+                <div class="fw-semibold">{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}</div>
+                <div class="small am-muted">{{ voiture.annee }} • {{ voiture.kilometrage|floatformat:0 }} km</div>
+              </div>
+              <div class="fw-semibold text-primary am-price">{{ voiture.prix|fcfa }}</div>
+            </div>
+            <div class="d-grid mt-3">
+              <a class="btn btn-outline-primary" href="{% url 'detail_voiture' voiture.id %}">Voir l'annonce</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="col-12">
+        <div class="alert alert-info mb-0">Aucune voiture disponible pour le moment.</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="am-divider my-5"></div>
+
+  <div class="d-flex align-items-end justify-content-between gap-3 mb-3">
+    <div>
+      <h2 class="h4 mb-1 home-section-title">Marques populaires</h2>
+      <p class="am-muted mb-0">Les marques les plus présentes sur la plateforme.</p>
+    </div>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'liste_voitures' %}">Voir tout</a>
+  </div>
+
+  <div class="row g-3">
+    {% for marque in marques_populaires %}
+      <div class="col-6 col-md-3 col-lg-2">
+        <div class="am-card am-card-hover p-3 h-100 text-center">
+          <div class="mb-2">
+            {% if marque.logo %}
+              <img src="{{ marque.logo.url }}" alt="{{ marque.nom }}" style="height:40px; width:auto" loading="lazy">
+            {% else %}
+              <span class="badge text-bg-light am-badge">{{ marque.nom|slice:":1" }}</span>
+            {% endif %}
+          </div>
+          <div class="fw-semibold">{{ marque.nom }}</div>
+          <div class="small am-muted">{{ marque.pays }}</div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="col-12">
+        <div class="alert alert-info mb-0">Aucune marque pour le moment.</div>
+      </div>
+    {% endfor %}
+  </div>
+  <div class="am-divider my-5"></div>
+
+  <section class="mb-4">
+  <div class="d-flex align-items-end justify-content-between gap-3 mb-3">
+    <div>
+      <h2 class="h4 mb-1 home-section-title">Nouveautés</h2>
+      <p class="am-muted mb-0">Les dernières annonces ajoutées.</p>
+    </div>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'liste_voitures' %}">Explorer</a>
+  </div>
+  <div class="row g-3">
+    {% for voiture in voitures_recentes %}
+      <div class="col-md-6 col-lg-4">
+        <div class="am-card am-card-hover h-100 overflow-hidden">
+          <div class="ratio ratio-16x9 bg-light">
+            <img class="am-img-cover" src="{{ voiture.image_principale.url }}"
+                 onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
+                 alt="{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}" loading="lazy">
+          </div>
+          <div class="p-3">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div>
+                <div class="fw-semibold">{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}</div>
+                <div class="small am-muted">{{ voiture.annee }} • {{ voiture.kilometrage|floatformat:0 }} km</div>
+              </div>
+              <div class="fw-semibold am-price text-primary">{{ voiture.prix|fcfa }}</div>
+            </div>
+            <div class="d-grid mt-3">
+              <a class="btn btn-outline-primary" href="{% url 'detail_voiture' voiture.id %}">
+                Voir l'annonce
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="col-12">
+        <div class="alert alert-info mb-0">Aucune voiture disponible pour le moment.</div>
+      </div>
+    {% endfor %}
+  </div>
+  </section>
+
+  <div class="am-divider my-5"></div>
+
+  <section>
+  <div class="d-flex align-items-end justify-content-between gap-3 mb-3">
+    <div>
+      <h2 class="h4 mb-1 home-section-title">Bonnes affaires</h2>
+      <p class="am-muted mb-0">Des prix attractifs parmi les annonces disponibles.</p>
+    </div>
+  </div>
+  <div class="row g-3">
+    {% for voiture in voitures_promo %}
+      <div class="col-md-6 col-lg-4">
+        <div class="am-card am-card-hover h-100 overflow-hidden">
+          <div class="ratio ratio-16x9 bg-light position-relative">
+            <span class="badge text-bg-warning position-absolute top-0 start-0 m-3">Bon plan</span>
+            <img class="am-img-cover" src="{{ voiture.image_principale.url }}"
+                 onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
+                 alt="{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}" loading="lazy">
+          </div>
+          <div class="p-3">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div>
+                <div class="fw-semibold">{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}</div>
+                <div class="small am-muted">{{ voiture.annee }} • {{ voiture.kilometrage|floatformat:0 }} km</div>
+              </div>
+              <div class="fw-semibold am-price text-primary">{{ voiture.prix|fcfa }}</div>
+            </div>
+            <div class="d-grid mt-3">
+              <a class="btn btn-outline-primary" href="{% url 'detail_voiture' voiture.id %}">Voir l'annonce</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="col-12">
+        <div class="alert alert-info mb-0">Aucune promotion pour le moment.</div>
+      </div>
+    {% endfor %}
+  </div>
+  </section>
+</section>
+{% endblock %}

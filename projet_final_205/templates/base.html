@@ -1,0 +1,198 @@
+{% load static %}
+<!doctype html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}AutoMarket{% endblock %}</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("theme");
+        if (t === "dark" || t === "light") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    })();
+  </script>
+
+  {% block extra_css %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <nav class="navbar navbar-expand-lg bg-white border-bottom shadow-sm sticky-top">
+    <div class="container">
+      <a class="navbar-brand fw-semibold d-flex align-items-center gap-2" href="{% url 'accueil' %}">
+        <span class="brand-mark"><i class="fa-solid fa-car-side"></i></span>
+        <span>AutoMarket</span>
+      </a>
+
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+              aria-controls="navbarNav" aria-expanded="false" aria-label="Ouvrir le menu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'accueil' %}active{% endif %}"
+               href="{% url 'accueil' %}">Accueil</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'liste_voitures' %}active{% endif %}"
+               href="{% url 'liste_voitures' %}">Explorer</a>
+          </li>
+          {% if user.is_staff %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
+               href="{% url 'dashboard' %}">Dashboard</a>
+          </li>
+          {% endif %}
+        </ul>
+
+        <div class="d-flex align-items-center gap-2">
+          {% if user.is_authenticated %}
+          <a class="btn btn-outline-secondary position-relative" href="{% url 'notifications' %}" aria-label="Notifications">
+            <i class="fa-regular fa-bell"></i>
+            {% if unread_notifications_count %}
+              <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-danger">
+                {{ unread_notifications_count }}
+              </span>
+            {% endif %}
+          </a>
+          <button class="btn btn-outline-secondary" type="button" data-theme-toggle aria-label="Mode sombre/clair">
+            <i class="fa-regular fa-moon"></i>
+          </button>
+
+          <a class="btn btn-primary d-none d-lg-inline-flex" href="{% url 'ajouter_voiture' %}">
+            <i class="fa-solid fa-plus me-2"></i> Publier une annonce
+          </a>
+
+          <div class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown"
+                    aria-expanded="false">
+              <i class="fa-regular fa-user me-2"></i>{{ user.username }}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="{% url 'mes_voitures' %}"><i class="fa-solid fa-list me-2"></i>Mes annonces</a></li>
+              <li><a class="dropdown-item" href="{% url 'mes_messages' %}"><i class="fa-regular fa-envelope me-2"></i>Messages</a></li>
+              <li><a class="dropdown-item" href="{% url 'mes_favoris' %}"><i class="fa-regular fa-heart me-2"></i>Favoris</a></li>
+              <li><a class="dropdown-item" href="{% url 'mes_achats' %}"><i class="fa-solid fa-receipt me-2"></i>Achats</a></li>
+              <li><a class="dropdown-item" href="{% url 'mes_ventes' %}"><i class="fa-solid fa-handshake me-2"></i>Ventes</a></li>
+              <li><a class="dropdown-item" href="{% url 'notifications' %}"><i class="fa-regular fa-bell me-2"></i>Notifications</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{% url 'deconnexion' %}"><i class="fa-solid fa-right-from-bracket me-2"></i>Déconnexion</a></li>
+            </ul>
+          </div>
+          {% else %}
+          <a class="btn btn-outline-secondary" href="{% url 'connexion' %}">Connexion</a>
+          <a class="btn btn-primary" href="{% url 'inscription' %}">Créer un compte</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-3">
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <main class="{% block main_class %}container py-4{% endblock %}">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="am-footer mt-5">
+    <div class="container py-5">
+      <div class="row g-4">
+        <div class="col-lg-5">
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <span class="brand-mark"><i class="fa-solid fa-car-side"></i></span>
+            <div>
+              <div class="fw-semibold text-white">AutoMarket</div>
+              <div class="small text-white-50">Marketplace automobile</div>
+            </div>
+          </div>
+          <p class="text-white-50 mb-4">
+            Achetez et vendez des voitures simplement, avec des annonces claires, des photos, et une navigation fluide.
+          </p>
+
+          <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-sm btn-outline-light" href="{% url 'liste_voitures' %}">
+              <i class="fa-solid fa-magnifying-glass me-2"></i>Explorer
+            </a>
+            {% if user.is_authenticated %}
+              <a class="btn btn-sm btn-primary" href="{% url 'ajouter_voiture' %}">
+                <i class="fa-solid fa-plus me-2"></i>Publier
+              </a>
+            {% else %}
+              <a class="btn btn-sm btn-primary" href="{% url 'inscription' %}">Créer un compte</a>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="col-6 col-lg-2">
+          <h6 class="text-uppercase small text-white-50 mb-3">Site</h6>
+          <ul class="list-unstyled vstack gap-2 mb-0">
+            <li><a class="am-footer-link" href="{% url 'accueil' %}">Accueil</a></li>
+            <li><a class="am-footer-link" href="{% url 'liste_voitures' %}">Explorer</a></li>
+            {% if user.is_staff %}
+              <li><a class="am-footer-link" href="{% url 'dashboard' %}">Dashboard</a></li>
+            {% endif %}
+          </ul>
+        </div>
+
+        <div class="col-6 col-lg-2">
+          <h6 class="text-uppercase small text-white-50 mb-3">Compte</h6>
+          <ul class="list-unstyled vstack gap-2 mb-0">
+            {% if user.is_authenticated %}
+              <li><a class="am-footer-link" href="{% url 'mes_voitures' %}">Mes annonces</a></li>
+              <li><a class="am-footer-link" href="{% url 'mes_favoris' %}">Favoris</a></li>
+              <li><a class="am-footer-link" href="{% url 'mes_achats' %}">Achats</a></li>
+              <li><a class="am-footer-link" href="{% url 'deconnexion' %}">Déconnexion</a></li>
+            {% else %}
+              <li><a class="am-footer-link" href="{% url 'connexion' %}">Connexion</a></li>
+              <li><a class="am-footer-link" href="{% url 'inscription' %}">Inscription</a></li>
+            {% endif %}
+          </ul>
+        </div>
+
+        <div class="col-lg-3">
+          <h6 class="text-uppercase small text-white-50 mb-3">Contact</h6>
+          <div class="text-white-50 vstack gap-2">
+            <div><i class="fa-regular fa-envelope me-2"></i>contact@automarket.com</div>
+            <div><i class="fa-solid fa-phone me-2"></i>ICT4D</div>
+          </div>
+
+          <div class="d-flex gap-2 mt-3">
+            <a class="am-social" href="#" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+            <a class="am-social" href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+            <a class="am-social" href="#" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
+            <a class="am-social" href="#" aria-label="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+          </div>
+        </div>
+      </div>
+
+      <div class="am-footer-bottom d-flex flex-wrap justify-content-between align-items-center gap-2 pt-4 mt-4">
+        <small class="text-white-50">&copy; {% now "Y" %} AutoMarket. Tous droits réservés.</small>
+        <small class="text-white-50">Django • Bootstrap • FCFA</small>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{% static 'js/app.js' %}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>
