@@ -8,6 +8,7 @@ from django.db.models import Q, Count, Avg, Sum
 from django.core.paginator import Paginator
 from django.http import HttpResponse
 from django.views.decorators.http import require_POST
+from django.utils.http import url_has_allowed_host_and_scheme
 import os
 from .models import Marque, Modele, Voiture, Favori, Transaction, Avis, Message, Notification
 from .forms import InscriptionForm, AvisForm
@@ -180,10 +181,8 @@ def inscription(request):
         form = InscriptionForm(request.POST)
         if form.is_valid():
             user = form.save()
-            
-            # Création automatique d'un profil utilisateur simple
-            user.backend = 'django.contrib.auth.backends.ModelBackend'
-            login(request, user)
+
+            login(request, user, backend="voitures.auth_backends.UsernameOrEmailBackend")
             
             messages.success(request, 'Inscription réussie ! Bienvenue sur AutoMarket.')
             return redirect('accueil')
@@ -207,13 +206,21 @@ def connexion(request):
             messages.success(request, f'Bienvenue {user.username} !')
             
             # Redirection vers la page demandée ou l'accueil
-            next_page = request.GET.get('next', 'accueil')
-            return redirect(next_page)
+            next_page = request.GET.get("next") or ""
+            if next_page and url_has_allowed_host_and_scheme(
+                url=next_page,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure(),
+            ):
+                return redirect(next_page)
+            return redirect("accueil")
         else:
             messages.error(request, 'Identifiants incorrects. Veuillez réessayer.')
     
     return render(request, 'voitures/connexion.html')
 
+@login_required
+@require_POST
 def deconnexion(request):
     """Déconnexion de l'utilisateur"""
     logout(request)

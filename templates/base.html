@@ -86,7 +86,14 @@
               <li><a class="dropdown-item" href="{% url 'mes_ventes' %}"><i class="fa-solid fa-handshake me-2"></i>Ventes</a></li>
               <li><a class="dropdown-item" href="{% url 'notifications' %}"><i class="fa-regular fa-bell me-2"></i>Notifications</a></li>
               <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item" href="{% url 'deconnexion' %}"><i class="fa-solid fa-right-from-bracket me-2"></i>Déconnexion</a></li>
+              <li>
+                <form method="post" action="{% url 'deconnexion' %}" class="px-2">
+                  {% csrf_token %}
+                  <button class="dropdown-item" type="submit">
+                    <i class="fa-solid fa-right-from-bracket me-2"></i>Déconnexion
+                  </button>
+                </form>
+              </li>
             </ul>
           </div>
           {% else %}
@@ -160,7 +167,12 @@
               <li><a class="am-footer-link" href="{% url 'mes_voitures' %}">Mes annonces</a></li>
               <li><a class="am-footer-link" href="{% url 'mes_favoris' %}">Favoris</a></li>
               <li><a class="am-footer-link" href="{% url 'mes_achats' %}">Achats</a></li>
-              <li><a class="am-footer-link" href="{% url 'deconnexion' %}">Déconnexion</a></li>
+              <li>
+                <form method="post" action="{% url 'deconnexion' %}">
+                  {% csrf_token %}
+                  <button class="am-footer-link btn btn-link p-0 text-start" type="submit">Déconnexion</button>
+                </form>
+              </li>
             {% else %}
               <li><a class="am-footer-link" href="{% url 'connexion' %}">Connexion</a></li>
               <li><a class="am-footer-link" href="{% url 'inscription' %}">Inscription</a></li>
