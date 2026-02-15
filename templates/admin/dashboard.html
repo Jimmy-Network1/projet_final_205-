@@ -68,7 +68,12 @@
                     <div class="small am-muted">{{ t.acheteur.username }} → {{ t.vendeur.username }}</div>
                   </td>
                   <td class="fw-semibold text-primary am-price">{{ t.prix_final|fcfa }}</td>
-                  <td><span class="badge text-bg-light am-badge">{{ t.get_statut_display_fr }}</span></td>
+                  <td>
+                    {% if t.statut == 'en_attente' %}<span class="badge text-bg-warning">En attente</span>
+                    {% elif t.statut == 'confirmee' %}<span class="badge text-bg-success">Confirmée</span>
+                    {% elif t.statut == 'annulee' %}<span class="badge text-bg-secondary">Annulée</span>
+                    {% else %}<span class="badge text-bg-light am-badge">{{ t.get_statut_display }}</span>{% endif %}
+                  </td>
                   <td class="text-nowrap">{{ t.date_transaction|date:"d/m/Y H:i" }}</td>
                 </tr>
               {% endfor %}
@@ -107,7 +112,12 @@
                     <div class="small am-muted">{{ t.acheteur.username }} → {{ t.vendeur.username }}</div>
                   </td>
                   <td class="fw-semibold text-primary am-price">{{ t.prix_final|fcfa }}</td>
-                  <td><span class="badge text-bg-light am-badge">{{ t.get_statut_display_fr }}</span></td>
+                  <td>
+                    {% if t.statut == 'en_attente' %}<span class="badge text-bg-warning">En attente</span>
+                    {% elif t.statut == 'confirmee' %}<span class="badge text-bg-success">Confirmée</span>
+                    {% elif t.statut == 'annulee' %}<span class="badge text-bg-secondary">Annulée</span>
+                    {% else %}<span class="badge text-bg-light am-badge">{{ t.get_statut_display }}</span>{% endif %}
+                  </td>
                   <td class="text-nowrap">{{ t.date_transaction|date:"d/m/Y H:i" }}</td>
                 </tr>
               {% endfor %}

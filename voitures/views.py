@@ -13,7 +13,7 @@ from django.utils import timezone
 from datetime import date
 import os
 from decimal import Decimal, InvalidOperation
-from .models import Marque, Modele, Voiture, Favori, Transaction, Avis, Message, Notification
+from .models import Marque, Modele, Voiture, Favori, Transaction, Avis, Message, Notification, ImageVoiture
 from .forms import InscriptionForm, AvisForm
 from .services import transactions
 
@@ -147,9 +147,10 @@ def liste_voitures(request):
 def detail_voiture(request, voiture_id):
     """Page de détails d'une voiture"""
     transactions.expire_stale_purchase_requests()
-    voiture = get_object_or_404(Voiture.objects.select_related(
-        'modele__marque', 'vendeur'
-    ), id=voiture_id)
+    voiture = get_object_or_404(
+        Voiture.objects.select_related('modele__marque', 'vendeur').prefetch_related("images"),
+        id=voiture_id,
+    )
 
     if request.method == "GET":
         if not request.user.is_authenticated or request.user != voiture.vendeur:
@@ -348,7 +349,7 @@ def ajouter_voiture(request):
                 vendeur=request.user
             )
             
-            # Gestion de l'image
+            # Gestion de l'image principale
             if 'image' in request.FILES:
                 error = _validate_uploaded_image(request.FILES["image"])
                 if error:
@@ -357,6 +358,17 @@ def ajouter_voiture(request):
                     return redirect("ajouter_voiture")
                 voiture.image_principale = request.FILES['image']
                 voiture.save()
+
+            # Images supplémentaires
+            extra_images = request.FILES.getlist("images")
+            ordre = 0
+            for img in extra_images:
+                error = _validate_uploaded_image(img)
+                if error:
+                    messages.warning(request, f"Image ignorée: {error}")
+                    continue
+                ImageVoiture.objects.create(voiture=voiture, image=img, ordre=ordre)
+                ordre += 1
             
             messages.success(request, 'Votre annonce a été publiée avec succès !')
             _notify(
