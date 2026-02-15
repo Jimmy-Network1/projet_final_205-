@@ -187,3 +187,84 @@ document.addEventListener("DOMContentLoaded", () => {
     update();
   }
 });
+
+// ======================
+// Ajax helpers (favoris, réservations)
+// ======================
+
+function getCsrfToken() {
+  const match = document.cookie.match(/csrftoken=([^;]+)/);
+  return match ? match[1] : "";
+}
+
+function showToast(message, variant = "info") {
+  if (!message) return;
+  const container = document.getElementById("toastContainer") || (() => {
+    const div = document.createElement("div");
+    div.className = "toast-container position-fixed bottom-0 end-0 p-3";
+    div.id = "toastContainer";
+    document.body.appendChild(div);
+    return div;
+  })();
+
+  const toastEl = document.createElement("div");
+  toastEl.className = `toast align-items-center text-bg-${variant} border-0 shadow`;
+  toastEl.setAttribute("role", "alert");
+  toastEl.innerHTML = `
+    <div class="d-flex">
+      <div class="toast-body">${message}</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fermer"></button>
+    </div>`;
+
+  container.appendChild(toastEl);
+  const toast = bootstrap.Toast.getOrCreateInstance(toastEl);
+  toast.show();
+  toastEl.addEventListener("hidden.bs.toast", () => toastEl.remove());
+}
+
+document.addEventListener("submit", async (event) => {
+  const form = event.target.closest("form[data-ajax]");
+  if (!form) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  const submitBtn = form.querySelector("button[type='submit']");
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    const res = await fetch(form.action, {
+      method: form.method || "POST",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+        "X-CSRFToken": getCsrfToken(),
+      },
+      body: new FormData(form),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) {
+      showToast(data.error || "Action impossible.", "danger");
+    } else {
+      showToast(data.message || "Action réalisée.", "success");
+      // Mise à jour UI favoris
+      if (form.querySelector(".js-favori-btn") && typeof data.favori === "boolean") {
+        const btn = form.querySelector(".js-favori-btn");
+        btn.innerHTML = data.favori
+          ? '<i class="fa-solid fa-heart me-2"></i> Retirer des favoris'
+          : '<i class="fa-regular fa-heart me-2"></i> Ajouter aux favoris';
+      }
+      // Fermer le collapse réservation si succès
+      if (form.id === "reservationForm" || form.closest("#reservationForm")) {
+        const collapseEl = document.getElementById("reservationForm");
+        if (collapseEl) {
+          const coll = bootstrap.Collapse.getOrCreateInstance(collapseEl, {toggle: false});
+          coll.hide();
+          form.reset();
+        }
+      }
+    }
+  } catch (err) {
+    showToast("Erreur réseau.", "danger");
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+});

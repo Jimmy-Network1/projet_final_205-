@@ -80,6 +80,8 @@
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
               <li><a class="dropdown-item" href="{% url 'mes_voitures' %}"><i class="fa-solid fa-list me-2"></i>Mes annonces</a></li>
+              <li><a class="dropdown-item" href="{% url 'mes_reservations' %}"><i class="fa-solid fa-calendar-check me-2"></i>Mes réservations</a></li>
+              <li><a class="dropdown-item" href="{% url 'reservations_a_traiter' %}"><i class="fa-regular fa-clock me-2"></i>Réservations à traiter</a></li>
               <li><a class="dropdown-item" href="{% url 'mes_messages' %}"><i class="fa-regular fa-envelope me-2"></i>Messages</a></li>
               <li><a class="dropdown-item" href="{% url 'mes_favoris' %}"><i class="fa-regular fa-heart me-2"></i>Favoris</a></li>
               <li><a class="dropdown-item" href="{% url 'mes_achats' %}"><i class="fa-solid fa-receipt me-2"></i>Achats</a></li>
@@ -167,6 +169,8 @@
           <ul class="list-unstyled vstack gap-2 mb-0">
             {% if user.is_authenticated %}
               <li><a class="am-footer-link" href="{% url 'mes_voitures' %}">Mes annonces</a></li>
+              <li><a class="am-footer-link" href="{% url 'mes_reservations' %}">Mes réservations</a></li>
+              <li><a class="am-footer-link" href="{% url 'reservations_a_traiter' %}">Réservations à traiter</a></li>
               <li><a class="am-footer-link" href="{% url 'mes_favoris' %}">Favoris</a></li>
               <li><a class="am-footer-link" href="{% url 'mes_achats' %}">Achats</a></li>
               <li>

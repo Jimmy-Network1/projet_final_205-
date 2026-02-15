@@ -89,9 +89,15 @@ def update_status(*, reservation_id: int, user, new_status: str) -> Reservation:
         res.statut = new_status
         res.save(update_fields=["statut", "date_creation"])
 
-        if new_status in {"refusee", "annulee"}:
+        if new_status == "acceptee":
+            res.voiture.est_reservee = True
+            res.voiture.save(update_fields=["est_reservee"])
+        elif new_status in {"refusee", "annulee"}:
             # Libérer la voiture si plus aucune réservation active
-            if not Reservation.overlaps(res.voiture_id, res.debut, res.fin):
+            active = Reservation.objects.filter(
+                voiture=res.voiture, statut__in=["en_attente", "acceptee"]
+            ).exclude(id=res.id)
+            if not active.exists():
                 res.voiture.est_reservee = False
                 res.voiture.save(update_fields=["est_reservee"])
 

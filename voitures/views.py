@@ -6,14 +6,25 @@ from django.contrib.auth.models import User  # IMPORT AJOUTÉ
 from django.contrib import messages
 from django.db.models import Q, Count, Avg, Sum
 from django.core.paginator import Paginator
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 from datetime import date
 import os
 from decimal import Decimal, InvalidOperation
-from .models import Marque, Modele, Voiture, Favori, Transaction, Avis, Message, Notification, ImageVoiture
+from .models import (
+    Marque,
+    Modele,
+    Voiture,
+    Favori,
+    Transaction,
+    Avis,
+    Message,
+    Notification,
+    ImageVoiture,
+    Reservation,
+)
 from .forms import InscriptionForm, AvisForm
 from .services import transactions
 from .services import reservations as res_service
@@ -485,6 +496,8 @@ def supprimer_voiture(request, voiture_id):
 def toggle_favori(request, voiture_id):
     """Ajouter/retirer une voiture des favoris"""
     if request.method != "POST":
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": "Méthode non autorisée."}, status=405)
         return redirect('detail_voiture', voiture_id=voiture_id)
     voiture = get_object_or_404(Voiture, id=voiture_id)
     
@@ -497,8 +510,12 @@ def toggle_favori(request, voiture_id):
     if not created:
         favori.delete()
         messages.info(request, 'Voiture retirée des favoris.')
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": True, "favori": False, "message": "Retirée des favoris"})
     else:
         messages.success(request, 'Voiture ajoutée aux favoris.')
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": True, "favori": True, "message": "Ajoutée aux favoris"})
     
     return redirect('detail_voiture', voiture_id=voiture_id)
 
@@ -695,6 +712,40 @@ def mes_ventes(request):
     context = {'ventes': ventes}
     return render(request, 'voitures/mes_ventes.html', context)
 
+
+@login_required
+def mes_reservations(request):
+    """Réservations faites par l'utilisateur (client)."""
+    res_list = Reservation.objects.filter(client=request.user).select_related(
+        "voiture__modele__marque", "voiture__vendeur"
+    ).order_by("-date_creation")
+
+    paginator = Paginator(res_list, 12)
+    page_number = request.GET.get("page")
+    reservations = paginator.get_page(page_number)
+
+    context = {
+        "reservations": reservations,
+    }
+    return render(request, "voitures/mes_reservations.html", context)
+
+
+@login_required
+def reservations_a_traiter(request):
+    """Réservations en attente sur les voitures du vendeur."""
+    res_list = Reservation.objects.filter(
+        voiture__vendeur=request.user, statut__in=["en_attente", "acceptee"]
+    ).select_related("voiture__modele__marque", "client").order_by("-date_creation")
+
+    paginator = Paginator(res_list, 20)
+    page_number = request.GET.get("page")
+    reservations = paginator.get_page(page_number)
+
+    context = {
+        "reservations": reservations,
+    }
+    return render(request, "voitures/reservations_a_traiter.html", context)
+
 @login_required
 def confirmer_vente(request, transaction_id):
     """Confirmer une vente"""
@@ -741,6 +792,115 @@ def annuler_transaction(request, transaction_id):
     )
     messages.info(request, "Demande annulée.")
     return redirect("mes_achats")
+
+
+@login_required
+def reserver_voiture(request, voiture_id):
+    """Réserver un créneau (essai ou blocage)"""
+    voiture = get_object_or_404(Voiture.objects.select_related("vendeur"), id=voiture_id, est_vendue=False)
+
+    if request.user == voiture.vendeur:
+        messages.error(request, "Vous ne pouvez pas réserver votre propre voiture.")
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": "Impossible de réserver votre propre voiture."}, status=400)
+        return redirect("detail_voiture", voiture_id=voiture_id)
+
+    if request.method == "POST":
+        debut_raw = request.POST.get("debut")
+        fin_raw = request.POST.get("fin")
+        type_res = request.POST.get("type") or "reservation"
+        note = (request.POST.get("note") or "").strip()
+        signature = (request.POST.get("signature") or "").strip()
+
+        if not debut_raw or not fin_raw:
+            messages.error(request, "Veuillez choisir un créneau.")
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "error": "Veuillez choisir un créneau."}, status=400)
+            return redirect("detail_voiture", voiture_id=voiture_id)
+
+        try:
+            debut = timezone.make_aware(datetime.fromisoformat(debut_raw))
+            fin = timezone.make_aware(datetime.fromisoformat(fin_raw))
+            res = res_service.create_reservation(
+                voiture_id=voiture.id,
+                client=request.user,
+                debut=debut,
+                fin=fin,
+                type=type_res,
+                note=note,
+                signature=signature,
+            )
+            _notify(
+                [voiture.vendeur],
+                type="purchase_request",
+                titre="Nouvelle réservation",
+                contenu=f"{request.user.username} demande un créneau sur #{voiture.id}.",
+                url=voiture.get_absolute_url(),
+            )
+            messages.success(request, "Demande de réservation envoyée. Le vendeur doit confirmer.")
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": True, "reservation_id": res.id, "message": "Demande envoyée"})
+        except ValueError as e:
+            messages.error(request, str(e))
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "error": str(e)}, status=400)
+        except Exception as e:
+            messages.error(request, f"Erreur: {e}")
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "error": str(e)}, status=400)
+
+        return redirect("detail_voiture", voiture_id=voiture_id)
+
+    return redirect("detail_voiture", voiture_id=voiture_id)
+
+
+@login_required
+@require_POST
+def reservation_action(request, reservation_id, action):
+    """Vendeur ou client change le statut (accepter/refuser/annuler)."""
+    try:
+        res = res_service.update_status(reservation_id=reservation_id, user=request.user, new_status=action)
+        voiture = res.voiture
+        if action == "acceptee":
+            _notify(
+                [res.client],
+                type="purchase_request",
+                titre="Réservation acceptée",
+                contenu=f"Votre créneau pour l'annonce #{voiture.id} est confirmé.",
+                url=voiture.get_absolute_url(),
+            )
+            messages.success(request, "Réservation acceptée.")
+        elif action == "refusee":
+            _notify(
+                [res.client],
+                type="purchase_request",
+                titre="Réservation refusée",
+                contenu=f"La réservation pour l'annonce #{voiture.id} a été refusée.",
+                url=voiture.get_absolute_url(),
+            )
+            messages.info(request, "Réservation refusée.")
+        elif action == "annulee":
+            _notify(
+                [res.voiture.vendeur],
+                type="purchase_request",
+                titre="Réservation annulée",
+                contenu=f"{request.user.username} a annulé la réservation sur #{voiture.id}.",
+                url=voiture.get_absolute_url(),
+            )
+            messages.info(request, "Réservation annulée.")
+
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": True, "reservation_id": res.id, "statut": res.statut})
+    except PermissionError:
+        messages.error(request, "Action non autorisée.")
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": "Action non autorisée."}, status=403)
+    except Exception as e:
+        messages.error(request, f"Erreur: {e}")
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": str(e)}, status=400)
+
+    return redirect("detail_voiture", voiture_id=res.voiture_id if 'res' in locals() else 0)
 
 
 @login_required

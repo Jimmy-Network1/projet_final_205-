@@ -100,6 +100,10 @@ class Voiture(models.Model):
     vendeur = models.ForeignKey(User, on_delete=models.CASCADE, related_name='voitures_vendues')
     est_vendue = models.BooleanField(default=False)
     est_reservee = models.BooleanField(default=False)
+    est_louee = models.BooleanField(default=False)
+    localisation = models.CharField(max_length=120, default="Dépôt")
+    carburant_niveau = models.PositiveSmallIntegerField(default=100)
+    gps_tracking_url = models.URLField(blank=True, default="")
     image_principale = models.ImageField(
         upload_to='voitures/', 
         default='voitures/default.jpg',
