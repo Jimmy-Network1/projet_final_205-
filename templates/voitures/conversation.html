@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Conversation - AutoMarket{% endblock %}
+{% block main_class %}container py-4{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+  <div>
+    <h1 class="h4 mb-1">Conversation avec {{ other.username }}</h1>
+    <div class="am-muted">
+      {% if conversation.is_support %}
+        Support AutoMarket
+      {% elif conversation.voiture_id %}
+        Annonce #{{ conversation.voiture.id }} — {{ conversation.voiture.modele.marque.nom }} {{ conversation.voiture.modele.nom }}
+      {% else %}
+        Conversation
+      {% endif %}
+    </div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'mes_messages' %}">
+    <i class="fa-solid fa-arrow-left me-2"></i>Retour
+  </a>
+</div>
+
+<div class="am-card overflow-hidden">
+  <div class="p-3 p-md-4 border-bottom">
+    <div class="fw-semibold">Messages</div>
+  </div>
+
+  <div class="p-3 p-md-4" style="max-height: 60vh; overflow:auto;">
+    {% if messages %}
+      <div class="vstack gap-2">
+        {% for m in messages %}
+          {% if m.expediteur_id == user.id %}
+            <div class="d-flex justify-content-end">
+              <div class="p-3 rounded-4 text-bg-primary" style="max-width: 80%;">
+                <div class="small opacity-75 mb-1">Vous • {{ m.date_envoi|date:"d/m/Y H:i" }}</div>
+                <div>{{ m.contenu }}</div>
+              </div>
+            </div>
+          {% else %}
+            <div class="d-flex justify-content-start">
+              <div class="p-3 rounded-4 bg-light border" style="max-width: 80%;">
+                <div class="small am-muted mb-1">{{ m.expediteur.username }} • {{ m.date_envoi|date:"d/m/Y H:i" }}</div>
+                <div>{{ m.contenu }}</div>
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="alert alert-info mb-0">Aucun message.</div>
+    {% endif %}
+  </div>
+
+  <div class="p-3 p-md-4 border-top">
+    <form method="post" class="d-flex gap-2">
+      {% csrf_token %}
+      <input class="form-control" name="contenu" placeholder="Écrire un message…" autocomplete="off">
+      <button class="btn btn-primary" type="submit">
+        <i class="fa-solid fa-paper-plane me-1"></i> Envoyer
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+

@@ -20,6 +20,7 @@ urlpatterns = [
     path('mes-achats/', views.mes_achats, name='mes_achats'),
     path('mes-ventes/', views.mes_ventes, name='mes_ventes'),
     path('mes-messages/', views.mes_messages, name='mes_messages'),
+    path('messages/<int:conversation_id>/', views.conversation_detail, name='conversation_detail'),
     path('notifications/', views.notifications, name='notifications'),
     path('transaction/<int:transaction_id>/confirmer/', views.confirmer_vente, name='confirmer_vente'),
     path('transaction/<int:transaction_id>/annuler/', views.annuler_transaction, name='annuler_transaction'),
@@ -44,6 +45,10 @@ urlpatterns = [
     
     # Pages d'administration (pour les utilisateurs staff)
     path('dashboard/', views.dashboard, name='dashboard'),
+    path('dashboard/annonce/<int:voiture_id>/moderation/', views.moderer_annonce, name='moderer_annonce'),
+    path('dashboard/avis/<int:avis_id>/moderation/', views.moderer_avis, name='moderer_avis'),
+    path("support/", views.support_inbox, name="support_inbox"),
+    path("support/start/<int:user_id>/", views.support_start, name="support_start"),
     
     # Page de test
     path('test/', views.test, name='test'),

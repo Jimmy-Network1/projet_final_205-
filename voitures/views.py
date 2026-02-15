@@ -4,16 +4,17 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User  # IMPORT AJOUTÉ
 from django.contrib import messages
-from django.db.models import Q, Count, Avg, Sum
+from django.db.models import Q, Count, Avg, Sum, Max
 from django.core.paginator import Paginator
 from django.http import Http404, HttpResponse
 from django.views.decorators.http import require_POST
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 import os
 from decimal import Decimal, InvalidOperation
-from .models import Marque, Modele, Voiture, Favori, Transaction, Avis, Message, Notification
+from .models import Conversation, Marque, Modele, Voiture, Favori, Transaction, Avis, Message, Notification
 from .forms import InscriptionForm, AvisForm
-from .services import transactions
+from .services import messaging, transactions
 
 
 def _validate_uploaded_image(uploaded_file):
@@ -449,7 +450,9 @@ def modifier_voiture(request, voiture_id):
 
             if previous_moderation_status in {"approved", "rejected"}:
                 voiture.moderation_status = "pending"
+                voiture.moderation_reason = ""
                 voiture.moderated_at = None
+                voiture.moderated_by = None
                 _notify(
                     _staff_users(),
                     type="listing_moderation",
@@ -550,6 +553,13 @@ def ajouter_avis(request, voiture_id):
             avis.commentaire = form.cleaned_data["commentaire"]
             avis.approuve = False
             avis.save(update_fields=["note", "commentaire", "approuve"])
+        _notify(
+            _staff_users(),
+            type="message",
+            titre="Avis à valider",
+            contenu=f"Avis en attente sur l'annonce #{voiture.id} (par {request.user.username}).",
+            url=voiture.get_absolute_url(),
+        )
         messages.success(request, "Avis envoyé. Il sera visible après validation.")
     else:
         messages.error(request, "Avis invalide. Vérifiez les champs.")
@@ -573,37 +583,173 @@ def envoyer_message(request, voiture_id):
         messages.error(request, "Message vide.")
         return redirect("detail_voiture", voiture_id=voiture_id)
 
-    Message.objects.create(
-        expediteur=request.user,
-        destinataire=voiture.vendeur,
-        sujet=f"Annonce #{voiture.id} — {voiture.modele.marque.nom} {voiture.modele.nom}",
+    sujet = f"Annonce #{voiture.id} — {voiture.modele.marque.nom} {voiture.modele.nom}"
+    result = messaging.send_message(
+        sender=request.user,
+        recipient=voiture.vendeur,
         contenu=contenu,
+        sujet=sujet,
+        voiture=voiture,
+        is_support=False,
     )
+
     _notify(
         [voiture.vendeur],
         type="message",
         titre="Nouveau message",
         contenu=f"Message reçu pour l'annonce #{voiture.id}.",
-        url=voiture.get_absolute_url(),
+        url=f"/messages/{result.conversation.id}/",
     )
-    messages.success(request, "Message envoyé au vendeur.")
-    return redirect("detail_voiture", voiture_id=voiture_id)
+    messages.success(request, "Message envoyé.")
+    return redirect("conversation_detail", conversation_id=result.conversation.id)
 
 
 @login_required
 def mes_messages(request):
-    recus = Message.objects.filter(destinataire=request.user).select_related("expediteur").order_by("-date_envoi")
-    envoyes = Message.objects.filter(expediteur=request.user).select_related("destinataire").order_by("-date_envoi")
+    conversations_qs = messaging.get_user_conversations_queryset(user=request.user).annotate(
+        last_date=Max("messages__date_envoi"),
+        unread_count=Count(
+            "messages",
+            filter=Q(messages__destinataire=request.user, messages__lu=False),
+        ),
+    ).order_by("-last_date", "-updated_at")
+    conversations = list(conversations_qs)
+    if conversations:
+        last_messages = (
+            Message.objects.filter(conversation__in=conversations)
+            .select_related("expediteur")
+            .order_by("conversation_id", "-date_envoi")
+        )
+    else:
+        last_messages = []
 
-    tab = request.GET.get("tab", "recus")
-    if tab not in {"recus", "envoyes"}:
-        tab = "recus"
+    last_by_conversation: dict[int, Message] = {}
+    for m in last_messages:
+        if m.conversation_id not in last_by_conversation:
+            last_by_conversation[m.conversation_id] = m
 
-    if tab == "recus":
-        Message.objects.filter(destinataire=request.user, lu=False).update(lu=True)
+    cards = []
+    for convo in conversations:
+        other = convo.participant_b if convo.participant_a_id == request.user.id else convo.participant_a
+        cards.append(
+            {
+                "conversation": convo,
+                "other": other,
+                "last_message": last_by_conversation.get(convo.id),
+            }
+        )
 
-    context = {"recus": recus, "envoyes": envoyes, "tab": tab}
-    return render(request, "voitures/mes_messages.html", context)
+    return render(request, "voitures/mes_messages.html", {"cards": cards})
+
+
+@login_required
+def conversation_detail(request, conversation_id):
+    convo = get_object_or_404(
+        Conversation.objects.select_related(
+            "participant_a",
+            "participant_b",
+            "voiture",
+            "voiture__modele",
+            "voiture__modele__marque",
+        ),
+        id=conversation_id,
+    )
+    if not messaging.user_can_access_conversation(convo=convo, user=request.user):
+        raise Http404
+
+    other = convo.other_for(request.user)
+    if not other and request.user.is_staff:
+        other = convo.participant_b
+
+    if request.method == "POST":
+        contenu = (request.POST.get("contenu") or "").strip()
+        if not contenu:
+            messages.error(request, "Message vide.")
+            return redirect("conversation_detail", conversation_id=convo.id)
+        if not other:
+            messages.error(request, "Destinataire introuvable.")
+            return redirect("mes_messages")
+
+        subject = (
+            f"Annonce #{convo.voiture.id} — {convo.voiture.modele.marque.nom} {convo.voiture.modele.nom}"
+            if convo.voiture_id
+            else "Support AutoMarket"
+        )
+        messaging.send_message(
+            sender=request.user,
+            recipient=other,
+            contenu=contenu,
+            sujet=subject,
+            voiture=convo.voiture,
+            is_support=convo.is_support,
+        )
+        return redirect("conversation_detail", conversation_id=convo.id)
+
+    Message.objects.filter(conversation=convo, destinataire=request.user, lu=False).update(lu=True)
+    msgs = convo.messages.select_related("expediteur", "destinataire").order_by("date_envoi")
+    return render(
+        request,
+        "voitures/conversation.html",
+        {"conversation": convo, "messages": msgs, "other": other},
+    )
+
+
+@login_required
+def support_inbox(request):
+    if not request.user.is_staff:
+        return redirect("accueil")
+
+    conversations = (
+        Conversation.objects.filter(is_support=True)
+        .select_related(
+            "participant_a",
+            "participant_b",
+            "voiture",
+            "voiture__modele",
+            "voiture__modele__marque",
+        )
+        .annotate(
+            last_date=Max("messages__date_envoi"),
+            unread_count=Count(
+                "messages",
+                filter=Q(messages__destinataire=request.user, messages__lu=False),
+            ),
+        )
+        .order_by("-last_date", "-updated_at")[:100]
+    )
+
+    q = (request.GET.get("q") or "").strip()
+    users = []
+    if q:
+        users = list(
+            User.objects.filter(Q(username__icontains=q) | Q(email__icontains=q))
+            .filter(is_active=True)
+            .order_by("username")[:20]
+        )
+
+    return render(
+        request,
+        "admin/support_inbox.html",
+        {"conversations": conversations, "q": q, "users": users},
+    )
+
+
+@login_required
+def support_start(request, user_id):
+    if not request.user.is_staff:
+        return redirect("accueil")
+
+    other = get_object_or_404(User, id=user_id, is_active=True)
+    if other.id == request.user.id:
+        return redirect("support_inbox")
+
+    convo = messaging.get_or_create_conversation(
+        user1=request.user,
+        user2=other,
+        voiture=None,
+        is_support=True,
+    )
+    return redirect("conversation_detail", conversation_id=convo.id)
 
 
 @login_required
@@ -828,6 +974,12 @@ def dashboard(request):
         "modele__marque", "vendeur"
     ).order_by("-date_ajout")[:10]
 
+    avis_a_valider = Avis.objects.filter(approuve=False).select_related(
+        "voiture__modele__marque",
+        "voiture__modele",
+        "utilisateur",
+    ).order_by("-date_publication")[:10]
+
     notifications_recentes = Notification.objects.filter(utilisateur=request.user).order_by("-date_creation")[:10]
     
     context = {
@@ -839,9 +991,103 @@ def dashboard(request):
         'transactions_en_attente': transactions_en_attente,
         'voitures_recentes': voitures_recentes,
         "voitures_a_valider": voitures_a_valider,
+        "avis_a_valider": avis_a_valider,
         'notifications_recentes': notifications_recentes,
     }
     return render(request, 'admin/dashboard.html', context)
+
+
+@login_required
+@require_POST
+def moderer_annonce(request, voiture_id):
+    if not request.user.is_staff:
+        return redirect("accueil")
+
+    voiture = get_object_or_404(Voiture.objects.select_related("vendeur", "modele__marque", "modele"), id=voiture_id)
+    action = (request.POST.get("action") or "").strip().lower()
+    reason = (request.POST.get("reason") or "").strip()
+
+    if action not in {"approve", "reject"}:
+        messages.error(request, "Action invalide.")
+        return redirect("dashboard")
+
+    if action == "reject" and not reason:
+        messages.error(request, "Motif obligatoire pour refuser une annonce.")
+        return redirect("dashboard")
+
+    if action == "approve":
+        voiture.moderation_status = "approved"
+        voiture.moderation_reason = ""
+        voiture.moderated_at = timezone.now()
+        voiture.moderated_by = request.user
+        voiture.save(update_fields=["moderation_status", "moderation_reason", "moderated_at", "moderated_by"])
+
+        _notify(
+            [voiture.vendeur],
+            type="listing_moderation",
+            titre="Annonce approuvée",
+            contenu=f"Votre annonce #{voiture.id} est maintenant visible.",
+            url=voiture.get_absolute_url(),
+        )
+        messages.success(request, f"Annonce #{voiture.id} approuvée.")
+        return redirect("dashboard")
+
+    # reject
+    voiture.moderation_status = "rejected"
+    voiture.moderation_reason = reason
+    voiture.moderated_at = timezone.now()
+    voiture.moderated_by = request.user
+    voiture.save(update_fields=["moderation_status", "moderation_reason", "moderated_at", "moderated_by"])
+
+    _notify(
+        [voiture.vendeur],
+        type="listing_moderation",
+        titre="Annonce refusée",
+        contenu=f"Annonce #{voiture.id} refusée: {reason}",
+        url=voiture.get_absolute_url(),
+    )
+    try:
+        messaging.send_message(
+            sender=request.user,
+            recipient=voiture.vendeur,
+            contenu=f"Votre annonce #{voiture.id} a été refusée.\n\nMotif: {reason}",
+            sujet=f"Refus annonce #{voiture.id}",
+            voiture=voiture,
+            is_support=True,
+        )
+    except Exception:
+        pass
+    messages.info(request, f"Annonce #{voiture.id} refusée.")
+    return redirect("dashboard")
+
+
+@login_required
+@require_POST
+def moderer_avis(request, avis_id):
+    if not request.user.is_staff:
+        return redirect("accueil")
+
+    avis = get_object_or_404(Avis.objects.select_related("voiture", "utilisateur"), id=avis_id)
+    action = (request.POST.get("action") or "").strip().lower()
+    if action not in {"approve", "reject"}:
+        messages.error(request, "Action invalide.")
+        return redirect("dashboard")
+
+    if action == "approve":
+        Avis.objects.filter(id=avis.id).update(approuve=True)
+        _notify(
+            [avis.utilisateur],
+            type="message",
+            titre="Avis approuvé",
+            contenu=f"Votre avis sur l'annonce #{avis.voiture_id} est maintenant visible.",
+            url=avis.voiture.get_absolute_url(),
+        )
+        messages.success(request, "Avis approuvé.")
+        return redirect("dashboard")
+
+    Avis.objects.filter(id=avis.id).delete()
+    messages.info(request, "Avis refusé (supprimé).")
+    return redirect("dashboard")
 
 # ==================== VUES D'ERREUR ====================
 

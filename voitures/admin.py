@@ -2,8 +2,16 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils import timezone
 from .models import (
-    Marque, Modele, Voiture, ImageVoiture, 
-    Favori, Avis, Transaction, Message, Notification
+    Conversation,
+    Marque,
+    Modele,
+    Voiture,
+    ImageVoiture,
+    Favori,
+    Avis,
+    Transaction,
+    Message,
+    Notification,
 )
 
 class ImageVoitureInline(admin.TabularInline):
@@ -50,6 +58,7 @@ class VoitureAdmin(admin.ModelAdmin):
         "get_prix_format",
         "vendeur",
         "moderation_status",
+        "moderated_by",
         "est_vendue",
         "date_ajout",
     ]
@@ -79,7 +88,7 @@ class VoitureAdmin(admin.ModelAdmin):
             'fields': ('image_principale',)
         }),
         ('Statut', {
-            'fields': ('moderation_status', 'moderated_at', 'est_vendue',)
+            'fields': ('moderation_status', 'moderation_reason', 'moderated_by', 'moderated_at', 'est_vendue',)
         }),
         ('Statistiques', {
             'fields': ('vue', 'date_ajout', 'date_modification', 'get_age', 'get_est_recente'),
@@ -122,7 +131,10 @@ class VoitureAdmin(admin.ModelAdmin):
 
         if previous_status != obj.moderation_status:
             if obj.moderation_status in {"approved", "rejected"}:
-                Voiture.objects.filter(pk=obj.pk).update(moderated_at=timezone.now())
+                Voiture.objects.filter(pk=obj.pk).update(
+                    moderated_at=timezone.now(),
+                    moderated_by=request.user,
+                )
                 if obj.vendeur and obj.vendeur.is_active:
                     Notification.objects.create(
                         utilisateur=obj.vendeur,
@@ -131,12 +143,12 @@ class VoitureAdmin(admin.ModelAdmin):
                         contenu=(
                             f"Votre annonce #{obj.id} est maintenant visible."
                             if obj.moderation_status == "approved"
-                            else f"Votre annonce #{obj.id} a été refusée. Modifiez-la puis renvoyez-la."
+                            else f"Votre annonce #{obj.id} a été refusée. Motif: {obj.moderation_reason or '—'}"
                         ),
                         url=obj.get_absolute_url(),
                     )
             elif obj.moderation_status == "pending":
-                Voiture.objects.filter(pk=obj.pk).update(moderated_at=None)
+                Voiture.objects.filter(pk=obj.pk).update(moderated_at=None, moderated_by=None, moderation_reason="")
 
     @admin.action(description="Approuver les annonces sélectionnées")
     def approve_listings(self, request, queryset):
@@ -146,7 +158,9 @@ class VoitureAdmin(admin.ModelAdmin):
         )
         updated = Voiture.objects.filter(id__in=[v.id for v in to_approve]).update(
             moderation_status="approved",
+            moderation_reason="",
             moderated_at=now,
+            moderated_by=request.user,
         )
 
         notifications = []
@@ -175,6 +189,7 @@ class VoitureAdmin(admin.ModelAdmin):
         updated = Voiture.objects.filter(id__in=[v.id for v in to_reject]).update(
             moderation_status="rejected",
             moderated_at=now,
+            moderated_by=request.user,
         )
 
         notifications = []
@@ -258,6 +273,14 @@ class MessageAdmin(admin.ModelAdmin):
         queryset.update(lu=False)
         self.message_user(request, f"{queryset.count()} messages marqués comme non lus.")
     marquer_comme_non_lu.short_description = "Marquer comme non lu"
+
+
+@admin.register(Conversation)
+class ConversationAdmin(admin.ModelAdmin):
+    list_display = ["id", "participant_a", "participant_b", "is_support", "voiture", "updated_at"]
+    list_filter = ["is_support", "updated_at"]
+    search_fields = ["participant_a__username", "participant_b__username", "voiture__id"]
+    readonly_fields = ["created_at", "updated_at"]
 
 
 @admin.register(Notification)

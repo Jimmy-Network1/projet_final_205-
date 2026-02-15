@@ -187,6 +187,9 @@
           <div class="fw-semibold">Annonce non publiée</div>
           {% if voiture.moderation_status == 'rejected' %}
             <div class="small">Cette annonce a été refusée. Modifiez-la puis renvoyez-la.</div>
+            {% if voiture.moderation_reason %}
+              <div class="small mt-2"><span class="fw-semibold">Motif:</span> {{ voiture.moderation_reason }}</div>
+            {% endif %}
           {% else %}
             <div class="small">Cette annonce est en attente de validation.</div>
           {% endif %}

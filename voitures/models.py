@@ -111,7 +111,15 @@ class Voiture(models.Model):
         default="pending",
         db_index=True,
     )
+    moderation_reason = models.TextField(blank=True)
     moderated_at = models.DateTimeField(blank=True, null=True)
+    moderated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="voitures_moderees",
+    )
     image_principale = models.ImageField(
         upload_to='voitures/', 
         default='voitures/default.jpg',
@@ -253,8 +261,16 @@ class Transaction(models.Model):
         return statuts.get(self.statut, self.statut)
 
 class Message(models.Model):
+    conversation = models.ForeignKey(
+        "Conversation",
+        on_delete=models.CASCADE,
+        related_name="messages",
+        null=True,
+        blank=True,
+    )
     expediteur = models.ForeignKey(User, on_delete=models.CASCADE, related_name='messages_envoyes')
     destinataire = models.ForeignKey(User, on_delete=models.CASCADE, related_name='messages_recus')
+    voiture = models.ForeignKey(Voiture, on_delete=models.SET_NULL, null=True, blank=True)
     sujet = models.CharField(max_length=200)
     contenu = models.TextField()
     date_envoi = models.DateTimeField(auto_now_add=True)
@@ -272,6 +288,38 @@ class Message(models.Model):
         self.lu = True
         self.save()
 
+
+class Conversation(models.Model):
+    """
+    Conversation 1:1 entre deux utilisateurs, optionnellement liée à une annonce.
+    `is_support=True` pour les échanges avec l'admin/support.
+    """
+
+    participant_a = models.ForeignKey(User, on_delete=models.CASCADE, related_name="conversations_a")
+    participant_b = models.ForeignKey(User, on_delete=models.CASCADE, related_name="conversations_b")
+    voiture = models.ForeignKey(Voiture, on_delete=models.SET_NULL, null=True, blank=True, related_name="conversations")
+    is_support = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["participant_a", "participant_b", "voiture", "is_support"],
+                name="uniq_conversation_participants_voiture_support",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.participant_a.username} ↔ {self.participant_b.username}"
+
+    def other_for(self, user: User) -> User | None:
+        if user_id := getattr(user, "id", None):
+            if self.participant_a_id == user_id:
+                return self.participant_b
+            if self.participant_b_id == user_id:
+                return self.participant_a
+        return None
 
 class Notification(models.Model):
     TYPE_CHOICES = [

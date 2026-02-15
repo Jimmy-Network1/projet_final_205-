@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Marque, Modele, Transaction, Voiture
+from .models import Avis, Conversation, Marque, Message, Modele, Transaction, Voiture
 
 
 class TransactionFlowTests(TestCase):
@@ -161,3 +161,89 @@ class ListingModerationTests(TestCase):
         self.client.force_login(self.buyer)
         resp = self.client.get(reverse("acheter_voiture", args=[v.id]))
         self.assertEqual(resp.status_code, 404)
+
+
+class AdminModerationAndMessagingTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="admin1", password="Admin123!", is_staff=True
+        )
+        self.seller = User.objects.create_user(username="seller3", password="Seller123!")
+        self.buyer = User.objects.create_user(username="buyer3", password="Buyer123!")
+        self.marque = Marque.objects.create(
+            nom="Toyota", pays="Japon", date_creation="2000-01-01"
+        )
+        self.modele = Modele.objects.create(
+            marque=self.marque,
+            nom="Corolla",
+            annee_lancement=2010,
+            type_carburant="essence",
+            transmission="manuelle",
+            puissance=100,
+            consommation=6.0,
+        )
+
+    def test_admin_reject_requires_reason(self):
+        v = Voiture.objects.create(
+            modele=self.modele,
+            prix="12000.00",
+            kilometrage=40000,
+            annee=2020,
+            couleur="gris",
+            etat="occasion",
+            description="Pending",
+            vendeur=self.seller,
+            moderation_status="pending",
+        )
+        self.client.force_login(self.admin)
+        resp = self.client.post(
+            reverse("moderer_annonce", args=[v.id]),
+            data={"action": "reject", "reason": ""},
+        )
+        self.assertEqual(resp.status_code, 302)
+        v.refresh_from_db()
+        self.assertEqual(v.moderation_status, "pending")
+
+    def test_admin_can_reject_listing_with_reason(self):
+        v = Voiture.objects.create(
+            modele=self.modele,
+            prix="12000.00",
+            kilometrage=40000,
+            annee=2020,
+            couleur="gris",
+            etat="occasion",
+            description="Pending",
+            vendeur=self.seller,
+            moderation_status="pending",
+        )
+        self.client.force_login(self.admin)
+        resp = self.client.post(
+            reverse("moderer_annonce", args=[v.id]),
+            data={"action": "reject", "reason": "Photos floues"},
+        )
+        self.assertEqual(resp.status_code, 302)
+        v.refresh_from_db()
+        self.assertEqual(v.moderation_status, "rejected")
+        self.assertEqual(v.moderation_reason, "Photos floues")
+        self.assertEqual(v.moderated_by_id, self.admin.id)
+
+    def test_listing_message_creates_conversation(self):
+        v = Voiture.objects.create(
+            modele=self.modele,
+            prix="12000.00",
+            kilometrage=40000,
+            annee=2020,
+            couleur="gris",
+            etat="occasion",
+            description="Approved",
+            vendeur=self.seller,
+            moderation_status="approved",
+        )
+        self.client.force_login(self.buyer)
+        resp = self.client.post(
+            reverse("envoyer_message", args=[v.id]),
+            data={"contenu": "Bonjour, la voiture est-elle disponible ?"},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(Conversation.objects.exists())
+        self.assertTrue(Message.objects.exists())
