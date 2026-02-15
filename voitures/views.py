@@ -4,19 +4,16 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User  # IMPORT AJOUTÉ
 from django.contrib import messages
-from django.db import transaction
 from django.db.models import Q, Count, Avg, Sum
 from django.core.paginator import Paginator
 from django.http import HttpResponse
 from django.views.decorators.http import require_POST
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.utils import timezone
-from django.conf import settings
 import os
-from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from .models import Marque, Modele, Voiture, Favori, Transaction, Avis, Message, Notification
 from .forms import InscriptionForm, AvisForm
+from .services import transactions
 
 
 def _validate_uploaded_image(uploaded_file):
@@ -46,37 +43,11 @@ def _notify(users, *, type, titre, contenu="", url=""):
         Notification.objects.bulk_create(notifications)
 
 
-def _expire_stale_purchase_requests() -> int:
-    """
-    Annule automatiquement les transactions 'en_attente' trop anciennes
-    et libère les voitures réservées qui n'ont plus de demande active.
-    """
-    ttl_hours = getattr(settings, "RESERVATION_TTL_HOURS", 24) or 24
-    try:
-        ttl_hours = int(ttl_hours)
-    except (TypeError, ValueError):
-        ttl_hours = 24
-
-    cutoff = timezone.now() - timedelta(hours=max(ttl_hours, 1))
-    stale = Transaction.objects.filter(statut="en_attente", date_transaction__lt=cutoff)
-    if not stale.exists():
-        return 0
-
-    car_ids = list(stale.values_list("voiture_id", flat=True).distinct())
-    updated = stale.update(statut="annulee")
-
-    if car_ids:
-        Voiture.objects.filter(id__in=car_ids, est_reservee=True).exclude(
-            transaction__statut="en_attente"
-        ).update(est_reservee=False)
-
-    return updated
-
 # ==================== VUES PUBLIQUES ====================
 
 def accueil(request):
     """Page d'accueil du site"""
-    _expire_stale_purchase_requests()
+    transactions.expire_stale_purchase_requests()
     voitures_recentes = Voiture.objects.filter(est_vendue=False).order_by('-date_ajout')[:6]
     voitures_promo = Voiture.objects.filter(est_vendue=False).order_by('prix')[:6]
     marques_populaires = Marque.objects.annotate(
@@ -95,7 +66,7 @@ def accueil(request):
 
 def liste_voitures(request):
     """Liste toutes les voitures avec filtres"""
-    _expire_stale_purchase_requests()
+    transactions.expire_stale_purchase_requests()
     voitures_list = Voiture.objects.filter(est_vendue=False).select_related(
         'modele__marque', 'vendeur'
     ).prefetch_related('favoris')
@@ -173,7 +144,7 @@ def liste_voitures(request):
 
 def detail_voiture(request, voiture_id):
     """Page de détails d'une voiture"""
-    _expire_stale_purchase_requests()
+    transactions.expire_stale_purchase_requests()
     voiture = get_object_or_404(Voiture.objects.select_related(
         'modele__marque', 'vendeur'
     ), id=voiture_id)
@@ -195,11 +166,8 @@ def detail_voiture(request, voiture_id):
 
     transaction_en_attente = None
     if request.user.is_authenticated:
-        transaction_en_attente = (
-            Transaction.objects.filter(voiture=voiture, statut="en_attente")
-            .filter(Q(acheteur=request.user) | Q(vendeur=request.user))
-            .order_by("-date_transaction")
-            .first()
+        transaction_en_attente = transactions.get_pending_transaction_for_user(
+            voiture=voiture, user=request.user
         )
     
     # Voitures similaires
@@ -584,7 +552,6 @@ def notifications(request):
 @login_required
 def acheter_voiture(request, voiture_id):
     """Processus d'achat d'une voiture"""
-    _expire_stale_purchase_requests()
     voiture = get_object_or_404(Voiture, id=voiture_id, est_vendue=False)
     
     if request.user == voiture.vendeur:
@@ -603,33 +570,7 @@ def acheter_voiture(request, voiture_id):
     
     if request.method == 'POST':
         try:
-            with transaction.atomic():
-                locked_voiture = Voiture.objects.select_for_update().get(id=voiture.id)
-                if locked_voiture.est_vendue:
-                    messages.error(request, "Cette voiture n'est plus disponible.")
-                    return redirect("detail_voiture", voiture_id=voiture_id)
-                if locked_voiture.est_reservee:
-                    messages.info(request, "Cette voiture est déjà réservée.")
-                    return redirect("detail_voiture", voiture_id=voiture_id)
-
-                existing = Transaction.objects.filter(
-                    voiture=locked_voiture, statut="en_attente", acheteur=request.user
-                ).first()
-                if existing:
-                    messages.info(request, "Votre demande est déjà en attente pour cette voiture.")
-                    return redirect("mes_achats")
-
-                Transaction.objects.create(
-                    voiture=locked_voiture,
-                    acheteur=request.user,
-                    vendeur=locked_voiture.vendeur,
-                    prix_final=locked_voiture.prix,
-                    statut="en_attente",
-                )
-
-                locked_voiture.est_reservee = True
-                locked_voiture.save(update_fields=["est_reservee"])
-
+            result = transactions.create_purchase_request(voiture_id=voiture.id, buyer=request.user)
             _notify(
                 [voiture.vendeur],
                 type="purchase_request",
@@ -644,14 +585,19 @@ def acheter_voiture(request, voiture_id):
                 contenu=f"Annonce #{voiture.id} — {voiture.modele.marque.nom} {voiture.modele.nom}.",
                 url="/dashboard/",
             )
-
-            messages.success(
-                request,
-                "Demande envoyée. La voiture est réservée pendant le traitement ("
-                f"{getattr(settings, 'RESERVATION_TTL_HOURS', 24)}h).",
-            )
+            if result.created:
+                messages.success(
+                    request,
+                    "Demande envoyée. La voiture est réservée pendant le traitement ("
+                    f"{transactions.get_reservation_ttl_hours()}h).",
+                )
+            else:
+                messages.info(request, "Votre demande est déjà en attente pour cette voiture.")
             return redirect("mes_achats")
 
+        except transactions.TransactionError as exc:
+            messages.info(request, str(exc))
+            return redirect("detail_voiture", voiture_id=voiture_id)
         except Voiture.DoesNotExist:
             messages.error(request, "Voiture introuvable.")
             return redirect("liste_voitures")
@@ -692,7 +638,6 @@ def mes_favoris(request):
 @login_required
 def mes_achats(request):
     """Historique des achats de l'utilisateur"""
-    _expire_stale_purchase_requests()
     achats = Transaction.objects.filter(acheteur=request.user).select_related(
         'voiture__modele__marque', 'vendeur'
     ).order_by('-date_transaction')
@@ -703,7 +648,6 @@ def mes_achats(request):
 @login_required
 def mes_ventes(request):
     """Historique des ventes de l'utilisateur"""
-    _expire_stale_purchase_requests()
     ventes = Transaction.objects.filter(vendeur=request.user).select_related(
         'voiture__modele__marque', 'acheteur'
     ).order_by('-date_transaction')
@@ -714,29 +658,11 @@ def mes_ventes(request):
 @login_required
 def confirmer_vente(request, transaction_id):
     """Confirmer une vente"""
-    _expire_stale_purchase_requests()
-    transaction = get_object_or_404(
-        Transaction, 
-        id=transaction_id, 
-        vendeur=request.user,
-        statut='en_attente'
-    )
-
     if request.method != "POST":
         return redirect('mes_ventes')
-    
-    transaction.statut = 'confirmee'
-    transaction.save()
 
+    transaction = transactions.confirm_sale(transaction_id=transaction_id, seller=request.user)
     voiture = transaction.voiture
-    voiture.est_vendue = True
-    voiture.est_reservee = False
-    voiture.save(update_fields=["est_vendue", "est_reservee"])
-
-    # Annuler toutes les autres demandes en attente sur cette voiture (si jamais).
-    Transaction.objects.filter(
-        voiture=voiture, statut="en_attente"
-    ).exclude(id=transaction.id).update(statut="annulee")
 
     _notify(
         [transaction.acheteur],
@@ -763,18 +689,8 @@ def annuler_transaction(request, transaction_id):
     """
     Annulation par l'acheteur d'une transaction en attente (libère la réservation).
     """
-    _expire_stale_purchase_requests()
-    trx = get_object_or_404(
-        Transaction, id=transaction_id, acheteur=request.user, statut="en_attente"
-    )
+    trx = transactions.cancel_purchase_request(transaction_id=transaction_id, buyer=request.user)
     voiture = trx.voiture
-
-    with transaction.atomic():
-        locked = Voiture.objects.select_for_update().get(id=voiture.id)
-        Transaction.objects.filter(id=trx.id, statut="en_attente").update(statut="annulee")
-        if not Transaction.objects.filter(voiture=locked, statut="en_attente").exists():
-            locked.est_reservee = False
-            locked.save(update_fields=["est_reservee"])
 
     _notify(
         [trx.vendeur],
@@ -793,18 +709,8 @@ def refuser_transaction(request, transaction_id):
     """
     Refus par le vendeur d'une transaction en attente (libère la réservation).
     """
-    _expire_stale_purchase_requests()
-    trx = get_object_or_404(
-        Transaction, id=transaction_id, vendeur=request.user, statut="en_attente"
-    )
+    trx = transactions.refuse_purchase_request(transaction_id=transaction_id, seller=request.user)
     voiture = trx.voiture
-
-    with transaction.atomic():
-        locked = Voiture.objects.select_for_update().get(id=voiture.id)
-        Transaction.objects.filter(id=trx.id, statut="en_attente").update(statut="annulee")
-        if not Transaction.objects.filter(voiture=locked, statut="en_attente").exists():
-            locked.est_reservee = False
-            locked.save(update_fields=["est_reservee"])
 
     _notify(
         [trx.acheteur],
@@ -823,7 +729,6 @@ def dashboard(request):
     """Tableau de bord utilisateur"""
     if not request.user.is_staff:
         return redirect('accueil')
-    _expire_stale_purchase_requests()
     
     # Statistiques pour l'admin
     total_utilisateurs = User.objects.count()

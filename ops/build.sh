@@ -2,6 +2,9 @@
 # build.sh
 echo "🚀 Démarrage du build..."
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
 # Installation des dépendances
 echo "📦 Installation des dépendances..."
 pip install -r requirements.txt

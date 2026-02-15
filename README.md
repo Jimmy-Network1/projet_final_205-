@@ -31,7 +31,7 @@ Ouvre `http://127.0.0.1:8000/`.
 Le projet supporte SQLite par défaut, mais peut imposer PostgreSQL via `REQUIRE_POSTGRES=true`.
 
 ```bash
-docker compose up -d db
+docker compose -f ops/compose.yml up -d db
 cp .env.example .env
 ```
 
@@ -55,21 +55,31 @@ python manage.py create_demo_data
 python manage.py generate_demo_images
 ```
 
-Comptes de démo (uniquement pour développement) :
+Comptes de démo (uniquement pour développement, non créés automatiquement) :
 - `admin / Admin123!`
 - `vendeur / Vendeur123!`
 - `acheteur / Acheteur123!`
+
+## Admin Django
+Créer (ou mettre à jour) un superuser :
+```bash
+python manage.py ensure_superuser --username admin --email admin@local.test --password Admin123!
+```
+Puis ouvre `http://127.0.0.1:8000/admin/`.
 
 ## Variables d’environnement (résumé)
 - `SECRET_KEY` : obligatoire en production
 - `DEBUG` : `true/false`
 - `DATABASE_URL` : Postgres (`postgres://...`) ou SQLite (par défaut si absent)
 - `REQUIRE_POSTGRES` : si `true`, Django refuse SQLite
+- `RESERVATION_TTL_HOURS` : délai d’expiration des demandes d’achat en attente
 - `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` : domaines autorisés (Render utilise aussi `RENDER_EXTERNAL_HOSTNAME`)
 
 ## Déploiement Render
-Le dépôt inclut `render.yaml`, `build.sh` et `start.sh` :
-- `build.sh` installe les dépendances et fait `collectstatic`
-- `start.sh` applique les migrations, prépare les médias et lance Gunicorn sur `$PORT`
+Le dépôt inclut `render.yaml` et les scripts dans `ops/` :
+- `ops/build.sh` installe les dépendances et fait `collectstatic`
+- `ops/start.sh` applique les migrations, prépare les médias et lance Gunicorn sur `$PORT`
 
 Sur Render, crée un “Web Service” à partir du repo, et un PostgreSQL (ou laisse `render.yaml` le décrire si tu utilises l’Infra-as-Code).
+
+Le `render.yaml` inclut aussi un job cron qui exécute `python manage.py expire_purchase_requests` chaque heure pour libérer les réservations expirées.
