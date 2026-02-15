@@ -4,12 +4,17 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User  # IMPORT AJOUTÉ
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Q, Count, Avg, Sum
 from django.core.paginator import Paginator
 from django.http import HttpResponse
 from django.views.decorators.http import require_POST
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils import timezone
+from django.conf import settings
 import os
+from datetime import timedelta
+from decimal import Decimal, InvalidOperation
 from .models import Marque, Modele, Voiture, Favori, Transaction, Avis, Message, Notification
 from .forms import InscriptionForm, AvisForm
 
@@ -40,10 +45,38 @@ def _notify(users, *, type, titre, contenu="", url=""):
     if notifications:
         Notification.objects.bulk_create(notifications)
 
+
+def _expire_stale_purchase_requests() -> int:
+    """
+    Annule automatiquement les transactions 'en_attente' trop anciennes
+    et libère les voitures réservées qui n'ont plus de demande active.
+    """
+    ttl_hours = getattr(settings, "RESERVATION_TTL_HOURS", 24) or 24
+    try:
+        ttl_hours = int(ttl_hours)
+    except (TypeError, ValueError):
+        ttl_hours = 24
+
+    cutoff = timezone.now() - timedelta(hours=max(ttl_hours, 1))
+    stale = Transaction.objects.filter(statut="en_attente", date_transaction__lt=cutoff)
+    if not stale.exists():
+        return 0
+
+    car_ids = list(stale.values_list("voiture_id", flat=True).distinct())
+    updated = stale.update(statut="annulee")
+
+    if car_ids:
+        Voiture.objects.filter(id__in=car_ids, est_reservee=True).exclude(
+            transaction__statut="en_attente"
+        ).update(est_reservee=False)
+
+    return updated
+
 # ==================== VUES PUBLIQUES ====================
 
 def accueil(request):
     """Page d'accueil du site"""
+    _expire_stale_purchase_requests()
     voitures_recentes = Voiture.objects.filter(est_vendue=False).order_by('-date_ajout')[:6]
     voitures_promo = Voiture.objects.filter(est_vendue=False).order_by('prix')[:6]
     marques_populaires = Marque.objects.annotate(
@@ -62,6 +95,7 @@ def accueil(request):
 
 def liste_voitures(request):
     """Liste toutes les voitures avec filtres"""
+    _expire_stale_purchase_requests()
     voitures_list = Voiture.objects.filter(est_vendue=False).select_related(
         'modele__marque', 'vendeur'
     ).prefetch_related('favoris')
@@ -139,6 +173,7 @@ def liste_voitures(request):
 
 def detail_voiture(request, voiture_id):
     """Page de détails d'une voiture"""
+    _expire_stale_purchase_requests()
     voiture = get_object_or_404(Voiture.objects.select_related(
         'modele__marque', 'vendeur'
     ), id=voiture_id)
@@ -157,6 +192,15 @@ def detail_voiture(request, voiture_id):
     
     # Récupérer les avis
     avis = Avis.objects.filter(voiture=voiture, approuve=True)
+
+    transaction_en_attente = None
+    if request.user.is_authenticated:
+        transaction_en_attente = (
+            Transaction.objects.filter(voiture=voiture, statut="en_attente")
+            .filter(Q(acheteur=request.user) | Q(vendeur=request.user))
+            .order_by("-date_transaction")
+            .first()
+        )
     
     # Voitures similaires
     voitures_similaires = Voiture.objects.filter(
@@ -170,6 +214,7 @@ def detail_voiture(request, voiture_id):
         'avis': avis,
         'voitures_similaires': voitures_similaires,
         'avis_form': AvisForm(),
+        "transaction_en_attente": transaction_en_attente,
     }
     return render(request, 'voitures/detail_voiture.html', context)
 
@@ -206,7 +251,7 @@ def connexion(request):
             messages.success(request, f'Bienvenue {user.username} !')
             
             # Redirection vers la page demandée ou l'accueil
-            next_page = request.GET.get("next") or ""
+            next_page = (request.POST.get("next") or request.GET.get("next") or "").strip()
             if next_page and url_has_allowed_host_and_scheme(
                 url=next_page,
                 allowed_hosts={request.get_host()},
@@ -236,13 +281,55 @@ def ajouter_voiture(request):
         try:
             # Récupération des données du formulaire
             marque_id = request.POST.get('marque')
-            modele_nom = request.POST.get('modele')
-            prix = request.POST.get('prix')
-            kilometrage = request.POST.get('kilometrage')
-            annee = request.POST.get('annee')
+            modele_nom = (request.POST.get('modele') or "").strip()
+            prix_raw = request.POST.get('prix')
+            kilometrage_raw = request.POST.get('kilometrage')
+            annee_raw = request.POST.get('annee')
             couleur = request.POST.get('couleur')
             etat = request.POST.get('etat')
-            description = request.POST.get('description')
+            description = (request.POST.get('description') or "").strip()
+            type_carburant = request.POST.get("type_carburant") or "essence"
+            transmission = request.POST.get("transmission") or "manuelle"
+            puissance_raw = request.POST.get("puissance")
+            consommation_raw = request.POST.get("consommation")
+
+            if not (marque_id and modele_nom and prix_raw and kilometrage_raw and annee_raw and couleur and etat and description):
+                messages.error(request, "Veuillez remplir tous les champs obligatoires.")
+                return redirect("ajouter_voiture")
+
+            try:
+                prix = Decimal(str(prix_raw))
+            except (InvalidOperation, TypeError, ValueError):
+                messages.error(request, "Prix invalide.")
+                return redirect("ajouter_voiture")
+            if prix <= 0:
+                messages.error(request, "Le prix doit être supérieur à 0.")
+                return redirect("ajouter_voiture")
+
+            try:
+                kilometrage = int(kilometrage_raw)
+            except (TypeError, ValueError):
+                messages.error(request, "Kilométrage invalide.")
+                return redirect("ajouter_voiture")
+            if kilometrage < 0:
+                messages.error(request, "Le kilométrage ne peut pas être négatif.")
+                return redirect("ajouter_voiture")
+
+            try:
+                annee = int(annee_raw)
+            except (TypeError, ValueError):
+                messages.error(request, "Année invalide.")
+                return redirect("ajouter_voiture")
+
+            try:
+                puissance = int(puissance_raw) if puissance_raw not in (None, "") else 100
+            except (TypeError, ValueError):
+                puissance = 100
+
+            try:
+                consommation = float(consommation_raw) if consommation_raw not in (None, "") else 6.0
+            except (TypeError, ValueError):
+                consommation = 6.0
             
             # Création ou récupération de la marque et du modèle
             marque = get_object_or_404(Marque, id=marque_id)
@@ -251,12 +338,15 @@ def ajouter_voiture(request):
                 nom=modele_nom,
                 defaults={
                     'annee_lancement': annee,
-                    'type_carburant': 'essence',
-                    'transmission': 'manuelle',
-                    'puissance': 100,
-                    'consommation': 6.0
+                    'type_carburant': type_carburant,
+                    'transmission': transmission,
+                    'puissance': puissance,
+                    'consommation': consommation,
                 }
             )
+            if not created:
+                # On conserve la fiche modèle existante pour rester cohérent (nom unique par marque).
+                pass
             
             # Création de la voiture
             voiture = Voiture.objects.create(
@@ -318,10 +408,28 @@ def modifier_voiture(request, voiture_id):
     if request.method == 'POST':
         try:
             # Récupérer les données du formulaire
-            prix = request.POST.get('prix')
-            kilometrage = request.POST.get('kilometrage')
-            description = request.POST.get('description')
+            prix_raw = request.POST.get('prix')
+            kilometrage_raw = request.POST.get('kilometrage')
+            description = (request.POST.get('description') or "").strip()
             est_vendue = 'est_vendue' in request.POST  # Checkbox renvoie 'on' si cochée
+
+            try:
+                prix = Decimal(str(prix_raw))
+            except (InvalidOperation, TypeError, ValueError):
+                messages.error(request, "Prix invalide.")
+                return redirect("modifier_voiture", voiture_id=voiture.id)
+            if prix <= 0:
+                messages.error(request, "Le prix doit être supérieur à 0.")
+                return redirect("modifier_voiture", voiture_id=voiture.id)
+
+            try:
+                kilometrage = int(kilometrage_raw)
+            except (TypeError, ValueError):
+                messages.error(request, "Kilométrage invalide.")
+                return redirect("modifier_voiture", voiture_id=voiture.id)
+            if kilometrage < 0:
+                messages.error(request, "Le kilométrage ne peut pas être négatif.")
+                return redirect("modifier_voiture", voiture_id=voiture.id)
             
             # Mettre à jour la voiture
             voiture.prix = prix
@@ -476,6 +584,7 @@ def notifications(request):
 @login_required
 def acheter_voiture(request, voiture_id):
     """Processus d'achat d'une voiture"""
+    _expire_stale_purchase_requests()
     voiture = get_object_or_404(Voiture, id=voiture_id, est_vendue=False)
     
     if request.user == voiture.vendeur:
@@ -483,23 +592,43 @@ def acheter_voiture(request, voiture_id):
         return redirect('detail_voiture', voiture_id=voiture_id)
 
     if voiture.est_reservee:
+        existing = Transaction.objects.filter(
+            voiture=voiture, statut="en_attente", acheteur=request.user
+        ).first()
+        if existing:
+            messages.info(request, "Votre demande est déjà en attente pour cette voiture.")
+            return redirect("mes_achats")
         messages.info(request, "Cette voiture est déjà réservée.")
         return redirect('detail_voiture', voiture_id=voiture_id)
     
     if request.method == 'POST':
         try:
-            # Création de la transaction
-            transaction = Transaction.objects.create(
-                voiture=voiture,
-                acheteur=request.user,
-                vendeur=voiture.vendeur,
-                prix_final=voiture.prix,
-                statut='en_attente'
-            )
-            
-            # Réserver la voiture (en attente de confirmation du vendeur)
-            voiture.est_reservee = True
-            voiture.save()
+            with transaction.atomic():
+                locked_voiture = Voiture.objects.select_for_update().get(id=voiture.id)
+                if locked_voiture.est_vendue:
+                    messages.error(request, "Cette voiture n'est plus disponible.")
+                    return redirect("detail_voiture", voiture_id=voiture_id)
+                if locked_voiture.est_reservee:
+                    messages.info(request, "Cette voiture est déjà réservée.")
+                    return redirect("detail_voiture", voiture_id=voiture_id)
+
+                existing = Transaction.objects.filter(
+                    voiture=locked_voiture, statut="en_attente", acheteur=request.user
+                ).first()
+                if existing:
+                    messages.info(request, "Votre demande est déjà en attente pour cette voiture.")
+                    return redirect("mes_achats")
+
+                Transaction.objects.create(
+                    voiture=locked_voiture,
+                    acheteur=request.user,
+                    vendeur=locked_voiture.vendeur,
+                    prix_final=locked_voiture.prix,
+                    statut="en_attente",
+                )
+
+                locked_voiture.est_reservee = True
+                locked_voiture.save(update_fields=["est_reservee"])
 
             _notify(
                 [voiture.vendeur],
@@ -515,15 +644,19 @@ def acheter_voiture(request, voiture_id):
                 contenu=f"Annonce #{voiture.id} — {voiture.modele.marque.nom} {voiture.modele.nom}.",
                 url="/dashboard/",
             )
-            
-            messages.success(request, 
-                'Votre demande d\'achat a été envoyée au vendeur. '
-                'Il vous contactera pour finaliser la transaction.'
+
+            messages.success(
+                request,
+                "Demande envoyée. La voiture est réservée pendant le traitement ("
+                f"{getattr(settings, 'RESERVATION_TTL_HOURS', 24)}h).",
             )
-            return redirect('mes_achats')
-            
+            return redirect("mes_achats")
+
+        except Voiture.DoesNotExist:
+            messages.error(request, "Voiture introuvable.")
+            return redirect("liste_voitures")
         except Exception as e:
-            messages.error(request, f'Erreur lors de l\'achat : {str(e)}')
+            messages.error(request, f"Erreur lors de l'achat : {str(e)}")
     
     context = {'voiture': voiture}
     return render(request, 'voitures/acheter_voiture.html', context)
@@ -559,6 +692,7 @@ def mes_favoris(request):
 @login_required
 def mes_achats(request):
     """Historique des achats de l'utilisateur"""
+    _expire_stale_purchase_requests()
     achats = Transaction.objects.filter(acheteur=request.user).select_related(
         'voiture__modele__marque', 'vendeur'
     ).order_by('-date_transaction')
@@ -569,6 +703,7 @@ def mes_achats(request):
 @login_required
 def mes_ventes(request):
     """Historique des ventes de l'utilisateur"""
+    _expire_stale_purchase_requests()
     ventes = Transaction.objects.filter(vendeur=request.user).select_related(
         'voiture__modele__marque', 'acheteur'
     ).order_by('-date_transaction')
@@ -579,6 +714,7 @@ def mes_ventes(request):
 @login_required
 def confirmer_vente(request, transaction_id):
     """Confirmer une vente"""
+    _expire_stale_purchase_requests()
     transaction = get_object_or_404(
         Transaction, 
         id=transaction_id, 
@@ -596,6 +732,11 @@ def confirmer_vente(request, transaction_id):
     voiture.est_vendue = True
     voiture.est_reservee = False
     voiture.save(update_fields=["est_vendue", "est_reservee"])
+
+    # Annuler toutes les autres demandes en attente sur cette voiture (si jamais).
+    Transaction.objects.filter(
+        voiture=voiture, statut="en_attente"
+    ).exclude(id=transaction.id).update(statut="annulee")
 
     _notify(
         [transaction.acheteur],
@@ -615,6 +756,66 @@ def confirmer_vente(request, transaction_id):
     messages.success(request, 'Vente confirmée avec succès !')
     return redirect('mes_ventes')
 
+
+@login_required
+@require_POST
+def annuler_transaction(request, transaction_id):
+    """
+    Annulation par l'acheteur d'une transaction en attente (libère la réservation).
+    """
+    _expire_stale_purchase_requests()
+    trx = get_object_or_404(
+        Transaction, id=transaction_id, acheteur=request.user, statut="en_attente"
+    )
+    voiture = trx.voiture
+
+    with transaction.atomic():
+        locked = Voiture.objects.select_for_update().get(id=voiture.id)
+        Transaction.objects.filter(id=trx.id, statut="en_attente").update(statut="annulee")
+        if not Transaction.objects.filter(voiture=locked, statut="en_attente").exists():
+            locked.est_reservee = False
+            locked.save(update_fields=["est_reservee"])
+
+    _notify(
+        [trx.vendeur],
+        type="purchase_request",
+        titre="Demande d'achat annulée",
+        contenu=f"{request.user.username} a annulé la demande sur l'annonce #{voiture.id}.",
+        url=voiture.get_absolute_url(),
+    )
+    messages.info(request, "Demande annulée.")
+    return redirect("mes_achats")
+
+
+@login_required
+@require_POST
+def refuser_transaction(request, transaction_id):
+    """
+    Refus par le vendeur d'une transaction en attente (libère la réservation).
+    """
+    _expire_stale_purchase_requests()
+    trx = get_object_or_404(
+        Transaction, id=transaction_id, vendeur=request.user, statut="en_attente"
+    )
+    voiture = trx.voiture
+
+    with transaction.atomic():
+        locked = Voiture.objects.select_for_update().get(id=voiture.id)
+        Transaction.objects.filter(id=trx.id, statut="en_attente").update(statut="annulee")
+        if not Transaction.objects.filter(voiture=locked, statut="en_attente").exists():
+            locked.est_reservee = False
+            locked.save(update_fields=["est_reservee"])
+
+    _notify(
+        [trx.acheteur],
+        type="purchase_request",
+        titre="Demande d'achat refusée",
+        contenu=f"Le vendeur a refusé la demande sur l'annonce #{voiture.id}.",
+        url=voiture.get_absolute_url(),
+    )
+    messages.info(request, "Demande refusée.")
+    return redirect("mes_ventes")
+
 # ==================== VUES ADMIN UTILISATEURS ====================
 
 @login_required
@@ -622,6 +823,7 @@ def dashboard(request):
     """Tableau de bord utilisateur"""
     if not request.user.is_staff:
         return redirect('accueil')
+    _expire_stale_purchase_requests()
     
     # Statistiques pour l'admin
     total_utilisateurs = User.objects.count()

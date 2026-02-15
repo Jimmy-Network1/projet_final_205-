@@ -176,6 +176,36 @@
         <span class="badge text-bg-light am-badge">#{{ voiture.id }}</span>
       </div>
 
+      {% if voiture.est_reservee and transaction_en_attente %}
+        {% if user == transaction_en_attente.acheteur %}
+          <div class="alert alert-warning">
+            Votre demande est <strong>en attente</strong> de confirmation du vendeur.
+            <div class="mt-2">
+              <form method="post" action="{% url 'annuler_transaction' transaction_en_attente.id %}">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-danger" type="submit">Annuler ma demande</button>
+              </form>
+            </div>
+          </div>
+        {% elif user == transaction_en_attente.vendeur %}
+          <div class="alert alert-warning">
+            Demande d'achat en attente de votre action (acheteur: <strong>{{ transaction_en_attente.acheteur.username }}</strong>).
+            <div class="mt-2 d-flex gap-2">
+              <form method="post" action="{% url 'confirmer_vente' transaction_en_attente.id %}">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-success" type="submit">Confirmer</button>
+              </form>
+              <form method="post" action="{% url 'refuser_transaction' transaction_en_attente.id %}">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-danger" type="submit">Refuser</button>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <div class="alert alert-warning mb-0">Cette voiture est réservée (transaction en attente).</div>
+        {% endif %}
+      {% endif %}
+
       <div class="d-grid gap-2">
         {% if user.is_authenticated and user != voiture.vendeur and not voiture.est_vendue and not voiture.est_reservee %}
           <a class="btn btn-success btn-lg" href="{% url 'acheter_voiture' voiture.id %}">
@@ -192,7 +222,7 @@
             </button>
           </form>
         {% elif voiture.est_reservee and not voiture.est_vendue %}
-          <div class="alert alert-warning mb-0">Cette voiture est réservée (transaction en attente).</div>
+          {# infos affichées plus haut #}
         {% elif user == voiture.vendeur %}
           <a class="btn btn-primary btn-lg" href="{% url 'modifier_voiture' voiture.id %}">
             <i class="fa-solid fa-pen-to-square me-2"></i> Modifier l'annonce

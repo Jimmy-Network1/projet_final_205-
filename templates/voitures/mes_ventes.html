@@ -54,10 +54,16 @@
               <td class="text-nowrap">{{ t.date_transaction|date:"d/m/Y H:i" }}</td>
               <td class="text-end">
                 {% if t.statut == 'en_attente' %}
-                  <form method="post" action="{% url 'confirmer_vente' t.id %}">
-                    {% csrf_token %}
-                    <button class="btn btn-sm btn-success" type="submit">Confirmer</button>
-                  </form>
+                  <div class="d-inline-flex gap-2">
+                    <form method="post" action="{% url 'confirmer_vente' t.id %}">
+                      {% csrf_token %}
+                      <button class="btn btn-sm btn-success" type="submit">Confirmer</button>
+                    </form>
+                    <form method="post" action="{% url 'refuser_transaction' t.id %}">
+                      {% csrf_token %}
+                      <button class="btn btn-sm btn-outline-danger" type="submit">Refuser</button>
+                    </form>
+                  </div>
                 {% else %}
                   <span class="small am-muted">—</span>
                 {% endif %}

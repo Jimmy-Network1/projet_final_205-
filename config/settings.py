@@ -160,6 +160,10 @@ LOGIN_REDIRECT_URL = 'accueil'
 LOGOUT_REDIRECT_URL = 'accueil'
 LOGIN_URL = 'connexion'
 
+# Réservations / transactions
+# Durée max (en heures) d'une transaction "en_attente" avant annulation automatique.
+RESERVATION_TTL_HOURS = int(os.getenv("RESERVATION_TTL_HOURS", "24"))
+
 # Paramètres de sécurité (activés en production uniquement)
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

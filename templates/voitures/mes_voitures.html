@@ -75,6 +75,8 @@
               <td>
                 {% if v.est_vendue %}
                   <span class="badge text-bg-danger">Vendue</span>
+                {% elif v.est_reservee %}
+                  <span class="badge text-bg-warning">Réservée</span>
                 {% else %}
                   <span class="badge text-bg-success">En vente</span>
                 {% endif %}

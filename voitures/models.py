@@ -43,7 +43,7 @@ class Modele(models.Model):
     marque = models.ForeignKey(Marque, on_delete=models.CASCADE, related_name='modeles')
     nom = models.CharField(max_length=100)
     annee_lancement = models.PositiveIntegerField(
-        validators=[MinValueValidator(1900), MaxValueValidator(2024)]
+        validators=[MinValueValidator(1900), MaxValueValidator(2026)]
     )
     type_carburant = models.CharField(max_length=20, choices=TYPE_CARBURANT, default='essence')
     transmission = models.CharField(max_length=20, choices=TRANSMISSION, default='manuelle')

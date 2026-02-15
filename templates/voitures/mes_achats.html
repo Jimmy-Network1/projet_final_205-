@@ -28,6 +28,7 @@
             <th class="text-nowrap">Vendeur</th>
             <th class="text-nowrap">Statut</th>
             <th class="text-nowrap">Date</th>
+            <th class="text-end">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -53,6 +54,16 @@
                 {% endif %}
               </td>
               <td class="text-nowrap">{{ t.date_transaction|date:"d/m/Y H:i" }}</td>
+              <td class="text-end">
+                {% if t.statut == 'en_attente' %}
+                  <form method="post" action="{% url 'annuler_transaction' t.id %}">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Annuler</button>
+                  </form>
+                {% else %}
+                  <span class="small am-muted">—</span>
+                {% endif %}
+              </td>
             </tr>
           {% endfor %}
         </tbody>
