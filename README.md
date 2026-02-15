@@ -1,65 +1,75 @@
-# 🚗 Vente de Voitures - Plateforme Django
+# Projet Final 205 — AutoMarket (Django)
 
-## 🌐 Démo en ligne
-**URL :** https://vente-voitures.onrender.com
+Plateforme web de vente/achat de voitures (annonces, favoris, réservations, notifications, etc.) développée avec Django.
 
-> Note (Render plan gratuit) : après quelques minutes d’inactivité, Render peut mettre le service en veille.
-> Le premier chargement peut alors prendre 10–30s. Rafraîchissez la page si besoin.
+## Code source
+- Repo GitHub : `https://github.com/Jimmy-Network1/projet_final_205-.git`
 
-## 👥 Comptes de test
-- **Admin :** admin / Admin123!
-- **Vendeur :** vendeur / Vendeur123!
-- **Acheteur :** acheteur / Acheteur123!
+## Démo en ligne (si déployé)
+- Exemple : `https://vente-voitures.onrender.com`
+- Note (Render plan gratuit) : après quelques minutes d’inactivité, le service peut “sleep”. Le premier chargement peut alors prendre 10–30s.
 
-## 🚀 Déploiement sur Render.com
+## Prérequis
+- Python 3.10+ (recommandé : 3.10.x comme sur Render)
+- (Optionnel) Docker + Docker Compose (pour PostgreSQL)
 
-### Prérequis
-- Compte [Render.com](https://render.com)
-- Compte [GitHub](https://github.com)
-
-### Étapes
-1. Forkez ce dépôt sur GitHub
-2. Connectez votre compte GitHub à Render
-3. Créez un nouveau "Web Service"
-4. Sélectionnez ce dépôt
-5. Render détectera automatiquement la configuration
-6. Cliquez sur "Create Web Service"
-
-## 🛠 Installation locale
-
+## Installation locale (simple, SQLite)
 ```bash
-# Cloner le projet
-git clone https://github.com/votreusername/vente-voitures.git
-cd vente-voitures
+git clone https://github.com/Jimmy-Network1/projet_final_205-.git
+cd projet_final_205-
 
-# Créer environnement virtuel
-python -m venv env
-source env/bin/activate  # Linux/Mac
-# ou
-env\Scripts\activate     # Windows
-
-# Installer les dépendances
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
-# Variables d'environnement (optionnel)
-# cp .env.example .env  (puis adaptez SECRET_KEY / DEBUG / DATABASE_URL)
-
-# Base de données (PostgreSQL recommandé / demandé pour le TP)
-# 1) Démarrer PostgreSQL (Docker)
-docker compose up -d db
-# 2) Mettre DATABASE_URL dans .env, ex:
-#    DATABASE_URL=postgres://vente_voitures_user:vente_voitures_password@localhost:5432/vente_voitures
-# 3) Appliquer les migrations
 python manage.py migrate
-# (Optionnel) Générer l'image par défaut des annonces
-python manage.py ensure_default_media
-
-# (Optionnel) Créer des comptes + données de démo
-python initialiser_donnees.py
-
-# Créer un superutilisateur
-python manage.py createsuperuser
-
-# Lancer le serveur
-python manage.py runserver
+python manage.py runserver 127.0.0.1:8000
 ```
+Ouvre `http://127.0.0.1:8000/`.
+
+## Installation locale (PostgreSQL via Docker)
+Le projet supporte SQLite par défaut, mais peut imposer PostgreSQL via `REQUIRE_POSTGRES=true`.
+
+```bash
+docker compose up -d db
+cp .env.example .env
+```
+
+Dans `.env`, configure par exemple :
+```bash
+DATABASE_URL=postgres://vente_voitures_user:vente_voitures_password@localhost:5432/vente_voitures
+REQUIRE_POSTGRES=true
+DEBUG=true
+```
+
+Puis :
+```bash
+python manage.py migrate
+python manage.py runserver 127.0.0.1:8000
+```
+
+## Données de démo / comptes
+Pour générer des comptes et des données de démo :
+```bash
+python manage.py create_demo_data
+python manage.py generate_demo_images
+```
+
+Comptes de démo (uniquement pour développement) :
+- `admin / Admin123!`
+- `vendeur / Vendeur123!`
+- `acheteur / Acheteur123!`
+
+## Variables d’environnement (résumé)
+- `SECRET_KEY` : obligatoire en production
+- `DEBUG` : `true/false`
+- `DATABASE_URL` : Postgres (`postgres://...`) ou SQLite (par défaut si absent)
+- `REQUIRE_POSTGRES` : si `true`, Django refuse SQLite
+- `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` : domaines autorisés (Render utilise aussi `RENDER_EXTERNAL_HOSTNAME`)
+
+## Déploiement Render
+Le dépôt inclut `render.yaml`, `build.sh` et `start.sh` :
+- `build.sh` installe les dépendances et fait `collectstatic`
+- `start.sh` applique les migrations, prépare les médias et lance Gunicorn sur `$PORT`
+
+Sur Render, crée un “Web Service” à partir du repo, et un PostgreSQL (ou laisse `render.yaml` le décrire si tu utilises l’Infra-as-Code).
