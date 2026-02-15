@@ -9,6 +9,15 @@ python manage.py migrate --noinput
 echo "🖼️ Ensuring default media..."
 python manage.py ensure_default_media || true
 
+if [[ "${ENSURE_SUPERUSER:-}" == "true" ]]; then
+  echo "👤 Ensuring superuser..."
+  python manage.py ensure_superuser \
+    --username "${ADMIN_USERNAME:-admin}" \
+    --email "${ADMIN_EMAIL:-admin@example.com}" \
+    ${ADMIN_PASSWORD:+--password "${ADMIN_PASSWORD}"} \
+    --print-password || true
+fi
+
 if [[ "${SEED_DEMO_DATA:-}" == "true" ]]; then
   echo "📊 Seeding demo data..."
   python manage.py create_demo_data || true
