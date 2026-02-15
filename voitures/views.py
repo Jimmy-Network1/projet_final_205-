@@ -291,6 +291,14 @@ def ajouter_voiture(request):
             puissance_raw = request.POST.get("puissance")
             consommation_raw = request.POST.get("consommation")
 
+            if not marque_id:
+                messages.error(
+                    request,
+                    "Aucune marque n'est disponible. Ajoutez d'abord des marques (admin) ou exécutez "
+                    "`python manage.py init_catalog`.",
+                )
+                return redirect("ajouter_voiture")
+
             if not (marque_id and modele_nom and prix_raw and kilometrage_raw and annee_raw and couleur and etat and description):
                 messages.error(request, "Veuillez remplir tous les champs obligatoires.")
                 return redirect("ajouter_voiture")
@@ -392,7 +400,7 @@ def ajouter_voiture(request):
             messages.error(request, f'Erreur lors de la création : {str(e)}')
     
     # GET request - afficher le formulaire
-    marques = Marque.objects.all()
+    marques = Marque.objects.all().order_by("nom")
     context = {'marques': marques}
     return render(request, 'voitures/ajouter_voiture.html', context)
 

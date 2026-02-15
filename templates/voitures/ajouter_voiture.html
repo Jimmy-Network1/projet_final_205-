@@ -18,6 +18,16 @@
       <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
 
+        {% if not marques %}
+          <div class="alert alert-warning">
+            <div class="fw-semibold mb-1">Aucune marque disponible</div>
+            <div class="small">
+              Ajoutez des marques via l'admin (table <code>Marque</code>) ou exécutez
+              <code>python manage.py init_catalog</code>.
+            </div>
+          </div>
+        {% endif %}
+
         <div class="row g-3">
           <div class="col-md-6">
             <label for="marque" class="form-label">Marque</label>
