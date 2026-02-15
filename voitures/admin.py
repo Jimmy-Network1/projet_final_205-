@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
+from django.utils import timezone
 from .models import (
     Marque, Modele, Voiture, ImageVoiture, 
     Favori, Avis, Transaction, Message, Notification
@@ -42,12 +43,30 @@ class ModeleAdmin(admin.ModelAdmin):
 
 @admin.register(Voiture)
 class VoitureAdmin(admin.ModelAdmin):
-    list_display = ['id', 'modele', 'annee', 'get_prix_format', 'vendeur', 'est_vendue', 'date_ajout']
-    list_filter = ['est_vendue', 'etat', 'couleur', 'modele__marque', 'date_ajout']
+    list_display = [
+        "id",
+        "modele",
+        "annee",
+        "get_prix_format",
+        "vendeur",
+        "moderation_status",
+        "est_vendue",
+        "date_ajout",
+    ]
+    list_filter = ["moderation_status", "est_vendue", "etat", "couleur", "modele__marque", "date_ajout"]
     search_fields = ['modele__nom', 'modele__marque__nom', 'vendeur__username', 'description']
-    readonly_fields = ['date_ajout', 'date_modification', 'vue', 'get_prix_format', 'get_age', 'get_est_recente']
+    readonly_fields = [
+        "date_ajout",
+        "date_modification",
+        "vue",
+        "get_prix_format",
+        "get_age",
+        "get_est_recente",
+        "moderated_at",
+    ]
     inlines = [ImageVoitureInline]
     list_per_page = 20
+    actions = ["approve_listings", "reject_listings"]
     
     fieldsets = (
         ('Informations générales', {
@@ -60,7 +79,7 @@ class VoitureAdmin(admin.ModelAdmin):
             'fields': ('image_principale',)
         }),
         ('Statut', {
-            'fields': ('est_vendue',)
+            'fields': ('moderation_status', 'moderated_at', 'est_vendue',)
         }),
         ('Statistiques', {
             'fields': ('vue', 'date_ajout', 'date_modification', 'get_age', 'get_est_recente'),
@@ -91,6 +110,62 @@ class VoitureAdmin(admin.ModelAdmin):
             return "Oui" if obj.est_recente() else "Non"
         return "N/A"
     get_est_recente.short_description = 'Récente'
+
+    @admin.action(description="Approuver les annonces sélectionnées")
+    def approve_listings(self, request, queryset):
+        now = timezone.now()
+        to_approve = list(
+            queryset.select_related("vendeur", "modele__marque", "modele").exclude(moderation_status="approved")
+        )
+        updated = Voiture.objects.filter(id__in=[v.id for v in to_approve]).update(
+            moderation_status="approved",
+            moderated_at=now,
+        )
+
+        notifications = []
+        for v in to_approve:
+            if v.vendeur and v.vendeur.is_active:
+                notifications.append(
+                    Notification(
+                        utilisateur=v.vendeur,
+                        type="listing_moderation",
+                        titre="Annonce approuvée",
+                        contenu=f"Votre annonce #{v.id} est maintenant visible.",
+                        url=v.get_absolute_url(),
+                    )
+                )
+        if notifications:
+            Notification.objects.bulk_create(notifications)
+
+        self.message_user(request, f"{updated} annonce(s) approuvée(s).")
+
+    @admin.action(description="Refuser les annonces sélectionnées")
+    def reject_listings(self, request, queryset):
+        now = timezone.now()
+        to_reject = list(
+            queryset.select_related("vendeur").exclude(moderation_status="rejected")
+        )
+        updated = Voiture.objects.filter(id__in=[v.id for v in to_reject]).update(
+            moderation_status="rejected",
+            moderated_at=now,
+        )
+
+        notifications = []
+        for v in to_reject:
+            if v.vendeur and v.vendeur.is_active:
+                notifications.append(
+                    Notification(
+                        utilisateur=v.vendeur,
+                        type="listing_moderation",
+                        titre="Annonce refusée",
+                        contenu=f"Votre annonce #{v.id} a été refusée. Modifiez-la puis renvoyez-la.",
+                        url=v.get_absolute_url(),
+                    )
+                )
+        if notifications:
+            Notification.objects.bulk_create(notifications)
+
+        self.message_user(request, f"{updated} annonce(s) refusée(s).")
 
 @admin.register(Favori)
 class FavoriAdmin(admin.ModelAdmin):

@@ -80,3 +80,84 @@ class AuthRedirectTests(TestCase):
         )
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(resp["Location"], reverse("accueil"))
+
+
+class ListingModerationTests(TestCase):
+    def setUp(self):
+        self.seller = User.objects.create_user(username="seller2", password="Seller123!")
+        self.buyer = User.objects.create_user(username="buyer2", password="Buyer123!")
+        self.marque = Marque.objects.create(
+            nom="Peugeot", pays="France", date_creation="2000-01-01"
+        )
+        self.modele = Modele.objects.create(
+            marque=self.marque,
+            nom="208",
+            annee_lancement=2015,
+            type_carburant="essence",
+            transmission="manuelle",
+            puissance=100,
+            consommation=5.5,
+        )
+
+    def test_pending_listing_hidden_from_public_list(self):
+        Voiture.objects.create(
+            modele=self.modele,
+            prix="9000.00",
+            kilometrage=60000,
+            annee=2019,
+            couleur="gris",
+            etat="occasion",
+            description="Pending",
+            vendeur=self.seller,
+            moderation_status="pending",
+        )
+        resp = self.client.get(reverse("liste_voitures"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context["voitures"].paginator.count, 0)
+
+    def test_pending_listing_detail_404_for_public(self):
+        v = Voiture.objects.create(
+            modele=self.modele,
+            prix="9000.00",
+            kilometrage=60000,
+            annee=2019,
+            couleur="gris",
+            etat="occasion",
+            description="Pending",
+            vendeur=self.seller,
+            moderation_status="pending",
+        )
+        resp = self.client.get(reverse("detail_voiture", args=[v.id]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_pending_listing_detail_visible_to_owner(self):
+        v = Voiture.objects.create(
+            modele=self.modele,
+            prix="9000.00",
+            kilometrage=60000,
+            annee=2019,
+            couleur="gris",
+            etat="occasion",
+            description="Pending",
+            vendeur=self.seller,
+            moderation_status="pending",
+        )
+        self.client.force_login(self.seller)
+        resp = self.client.get(reverse("detail_voiture", args=[v.id]))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_unapproved_listing_cannot_be_purchased(self):
+        v = Voiture.objects.create(
+            modele=self.modele,
+            prix="9000.00",
+            kilometrage=60000,
+            annee=2019,
+            couleur="gris",
+            etat="occasion",
+            description="Pending",
+            vendeur=self.seller,
+            moderation_status="pending",
+        )
+        self.client.force_login(self.buyer)
+        resp = self.client.get(reverse("acheter_voiture", args=[v.id]))
+        self.assertEqual(resp.status_code, 404)

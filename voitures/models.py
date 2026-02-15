@@ -84,6 +84,12 @@ class Voiture(models.Model):
         ('marron', 'Marron'),
         ('beige', 'Beige'),
     ]
+
+    MODERATION_STATUS_CHOICES = [
+        ("pending", "En attente"),
+        ("approved", "Approuvée"),
+        ("rejected", "Refusée"),
+    ]
     
     modele = models.ForeignKey(Modele, on_delete=models.CASCADE, related_name='voitures')
     prix = models.DecimalField(max_digits=10, decimal_places=2)
@@ -99,6 +105,13 @@ class Voiture(models.Model):
     vendeur = models.ForeignKey(User, on_delete=models.CASCADE, related_name='voitures_vendues')
     est_vendue = models.BooleanField(default=False)
     est_reservee = models.BooleanField(default=False)
+    moderation_status = models.CharField(
+        max_length=12,
+        choices=MODERATION_STATUS_CHOICES,
+        default="pending",
+        db_index=True,
+    )
+    moderated_at = models.DateTimeField(blank=True, null=True)
     image_principale = models.ImageField(
         upload_to='voitures/', 
         default='voitures/default.jpg',
@@ -117,6 +130,9 @@ class Voiture(models.Model):
     def incrementer_vue(self):
         self.vue += 1
         self.save(update_fields=['vue'])
+
+    def est_approuvee(self) -> bool:
+        return self.moderation_status == "approved"
     
     def prix_format(self):
         if self.prix is None:
@@ -260,6 +276,7 @@ class Message(models.Model):
 class Notification(models.Model):
     TYPE_CHOICES = [
         ("new_listing", "Nouvelle annonce"),
+        ("listing_moderation", "Validation annonce"),
         ("purchase_request", "Demande d'achat"),
         ("sale_confirmed", "Vente confirmée"),
         ("message", "Message"),

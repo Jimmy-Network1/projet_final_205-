@@ -18,7 +18,13 @@
   <div class="col-lg-8">
     <div class="am-card overflow-hidden mb-4">
       <div class="ratio ratio-16x9 bg-light position-relative">
-        {% if voiture.est_vendue %}
+        {% if voiture.moderation_status != 'approved' %}
+          {% if voiture.moderation_status == 'rejected' %}
+            <span class="badge text-bg-danger position-absolute top-0 start-0 m-3">Refusée</span>
+          {% else %}
+            <span class="badge text-bg-info position-absolute top-0 start-0 m-3">En validation</span>
+          {% endif %}
+        {% elif voiture.est_vendue %}
           <span class="badge text-bg-danger position-absolute top-0 start-0 m-3">Vendue</span>
         {% elif voiture.est_reservee %}
           <span class="badge text-bg-warning position-absolute top-0 start-0 m-3">Réservée</span>
@@ -176,6 +182,17 @@
         <span class="badge text-bg-light am-badge">#{{ voiture.id }}</span>
       </div>
 
+      {% if voiture.moderation_status != 'approved' %}
+        <div class="alert alert-info">
+          <div class="fw-semibold">Annonce non publiée</div>
+          {% if voiture.moderation_status == 'rejected' %}
+            <div class="small">Cette annonce a été refusée. Modifiez-la puis renvoyez-la.</div>
+          {% else %}
+            <div class="small">Cette annonce est en attente de validation.</div>
+          {% endif %}
+        </div>
+      {% endif %}
+
       {% if voiture.est_reservee and transaction_en_attente %}
         {% if user == transaction_en_attente.acheteur %}
           <div class="alert alert-warning">
@@ -207,7 +224,7 @@
       {% endif %}
 
       <div class="d-grid gap-2">
-        {% if user.is_authenticated and user != voiture.vendeur and not voiture.est_vendue and not voiture.est_reservee %}
+        {% if voiture.moderation_status == 'approved' and user.is_authenticated and user != voiture.vendeur and not voiture.est_vendue and not voiture.est_reservee %}
           <a class="btn btn-success btn-lg" href="{% url 'acheter_voiture' voiture.id %}">
             <i class="fa-solid fa-cart-shopping me-2"></i> Acheter
           </a>

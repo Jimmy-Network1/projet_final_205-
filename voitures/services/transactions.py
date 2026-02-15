@@ -69,6 +69,9 @@ def create_purchase_request(*, voiture_id: int, buyer: User) -> PurchaseRequestR
     with db_transaction.atomic():
         locked_voiture = Voiture.objects.select_for_update().select_related("vendeur").get(id=voiture_id)
 
+        if locked_voiture.moderation_status != "approved":
+            raise TransactionError("Cette annonce n'est pas encore validée.")
+
         if locked_voiture.est_vendue:
             raise TransactionError("Cette voiture n'est plus disponible.")
 
@@ -152,4 +155,3 @@ def confirm_sale(*, transaction_id: int, seller: User) -> Transaction:
 
     trx.refresh_from_db()
     return trx
-

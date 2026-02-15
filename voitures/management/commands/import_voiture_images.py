@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 from voitures.models import Marque, Modele, Voiture
 
@@ -155,6 +156,8 @@ class Command(BaseCommand):
                 etat="occasion",
                 description="Annonce de démonstration (photo importée).",
                 vendeur=vendeur,
+                moderation_status="approved",
+                moderated_at=timezone.now(),
             )
             return voiture
 
