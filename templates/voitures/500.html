@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block title %}Erreur serveur - AutoMarket{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="am-card p-4 p-md-5 text-center">
+      <div class="display-6 fw-semibold mb-2">500</div>
+      <h1 class="h4 mb-2">Erreur serveur</h1>
+      <p class="am-muted mb-4">Une erreur est survenue. Réessayez dans quelques instants.</p>
+      <div class="d-flex justify-content-center gap-2 flex-wrap">
+        <a class="btn btn-primary" href="{% url 'accueil' %}">Retour à l'accueil</a>
+        <a class="btn btn-outline-secondary" href="{% url 'liste_voitures' %}">Explorer</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

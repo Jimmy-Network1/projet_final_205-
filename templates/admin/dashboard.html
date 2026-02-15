@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load currency %}
+
+{% block title %}Dashboard - AutoMarket{% endblock %}
+{% block main_class %}container py-4{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-1">Dashboard</h1>
+    <p class="am-muted mb-0">Vue d'ensemble de l'activité (admin).</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'accueil' %}">Accueil</a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="am-kpi p-3">
+      <div class="small am-muted">Utilisateurs</div>
+      <div class="h4 mb-0 value">{{ total_utilisateurs }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="am-kpi p-3">
+      <div class="small am-muted">Voitures</div>
+      <div class="h4 mb-0 value">{{ total_voitures }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="am-kpi p-3">
+      <div class="small am-muted">Transactions</div>
+      <div class="h4 mb-0 value">{{ total_transactions }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="am-kpi p-3">
+      <div class="small am-muted">Chiffre d'affaires</div>
+      <div class="h4 mb-0 value">{{ chiffre_affaires|fcfa }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="am-card overflow-hidden">
+      <div class="p-3 p-md-4 border-bottom">
+        <div class="fw-semibold">Transactions en attente</div>
+      </div>
+      {% if transactions_en_attente %}
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>ID</th>
+                <th>Voiture</th>
+                <th class="text-nowrap">Prix</th>
+                <th class="text-nowrap">Statut</th>
+                <th class="text-nowrap">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in transactions_en_attente %}
+                <tr>
+                  <td class="text-nowrap">#{{ t.id }}</td>
+                  <td>
+                    <span class="fw-semibold">{{ t.voiture.modele.marque.nom }} {{ t.voiture.modele.nom }}</span>
+                    <div class="small am-muted">{{ t.acheteur.username }} → {{ t.vendeur.username }}</div>
+                  </td>
+                  <td class="fw-semibold text-primary am-price">{{ t.prix_final|fcfa }}</td>
+                  <td><span class="badge text-bg-light am-badge">{{ t.get_statut_display_fr }}</span></td>
+                  <td class="text-nowrap">{{ t.date_transaction|date:"d/m/Y H:i" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-4">
+          <div class="alert alert-info mb-0">Aucune transaction.</div>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="am-card overflow-hidden mt-4">
+      <div class="p-3 p-md-4 border-bottom d-flex justify-content-between align-items-center">
+        <div class="fw-semibold">Dernières transactions</div>
+      </div>
+      {% if transactions_recentes %}
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>ID</th>
+                <th>Voiture</th>
+                <th class="text-nowrap">Prix</th>
+                <th class="text-nowrap">Statut</th>
+                <th class="text-nowrap">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in transactions_recentes %}
+                <tr>
+                  <td class="text-nowrap">#{{ t.id }}</td>
+                  <td>
+                    <span class="fw-semibold">{{ t.voiture.modele.marque.nom }} {{ t.voiture.modele.nom }}</span>
+                    <div class="small am-muted">{{ t.acheteur.username }} → {{ t.vendeur.username }}</div>
+                  </td>
+                  <td class="fw-semibold text-primary am-price">{{ t.prix_final|fcfa }}</td>
+                  <td><span class="badge text-bg-light am-badge">{{ t.get_statut_display_fr }}</span></td>
+                  <td class="text-nowrap">{{ t.date_transaction|date:"d/m/Y H:i" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-4">
+          <div class="alert alert-info mb-0">Aucune transaction.</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="am-card overflow-hidden">
+      <div class="p-3 p-md-4 border-bottom">
+        <div class="fw-semibold">Dernières annonces</div>
+      </div>
+      {% if voitures_recentes %}
+        <div class="list-group list-group-flush">
+          {% for v in voitures_recentes %}
+            <a class="list-group-item list-group-item-action d-flex align-items-center gap-3" href="{% url 'detail_voiture' v.id %}">
+              <div class="am-car-media" style="width:80px; height:56px;">
+                <img class="am-img-cover" src="{{ v.image_principale.url }}"
+                     onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
+                     alt="{{ v.modele.marque.nom }} {{ v.modele.nom }}">
+              </div>
+              <div class="flex-grow-1">
+                <div class="fw-semibold">{{ v.modele.marque.nom }} {{ v.modele.nom }}</div>
+                <div class="small am-muted">{{ v.annee }} • {{ v.kilometrage|floatformat:0 }} km</div>
+              </div>
+              <div class="fw-semibold text-primary am-price">{{ v.prix|fcfa }}</div>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="p-4">
+          <div class="alert alert-info mb-0">Aucune annonce.</div>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="am-card overflow-hidden mt-4">
+      <div class="p-3 p-md-4 border-bottom d-flex justify-content-between align-items-center">
+        <div class="fw-semibold">Notifications (admin)</div>
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'notifications' %}">Tout voir</a>
+      </div>
+      {% if notifications_recentes %}
+        <div class="list-group list-group-flush">
+          {% for n in notifications_recentes %}
+            <div class="list-group-item">
+              <div class="fw-semibold">{{ n.titre }}</div>
+              {% if n.contenu %}<div class="small am-muted">{{ n.contenu }}</div>{% endif %}
+              <div class="small am-muted mt-1">{{ n.date_creation|date:"d/m/Y H:i" }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="p-4">
+          <div class="alert alert-info mb-0">Aucune notification.</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

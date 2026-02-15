@@ -1,0 +1,39 @@
+# .gitignore
+# Django
+*.pyc
+*~
+__pycache__
+db.sqlite3
+media/
+staticfiles/
+*.log
+*.pid
+
+# Environnement
+env/
+venv/
+.venv/
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Render
+.render/
+
+# Assets locaux (non versionnés)
+LES IMAGES/
+
+# Aperçus / fichiers locaux
+preview/
+os
+sys

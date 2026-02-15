@@ -1,0 +1,257 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load currency %}
+
+{% block title %}Explorer - AutoMarket{% endblock %}
+{% block main_class %}container py-4{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-1">Explorer les voitures</h1>
+    <div class="am-muted">
+      {% if prix_moyen %}
+        Prix moyen: <span class="fw-semibold">{{ prix_moyen|fcfa }}</span>
+      {% endif %}
+      {% if voitures.paginator.count %}
+        <span class="mx-2">•</span>{{ voitures.paginator.count }} résultat{{ voitures.paginator.count|pluralize }}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-secondary d-lg-none" type="button" data-bs-toggle="offcanvas"
+            data-bs-target="#filtersCanvas" aria-controls="filtersCanvas">
+      <i class="fa-solid fa-sliders me-2"></i> Filtres
+    </button>
+    {% if user.is_authenticated %}
+      <a class="btn btn-primary" href="{% url 'ajouter_voiture' %}">
+        <i class="fa-solid fa-plus me-2"></i> Publier
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-4">
+  <aside class="col-lg-3">
+    <div class="am-card p-3 p-lg-4 d-none d-lg-block">
+      <h2 class="h6 mb-3">Filtres</h2>
+      <form method="get" action="{% url 'liste_voitures' %}" class="vstack gap-3">
+        <div>
+          <label class="form-label" for="q">Recherche</label>
+          <input class="form-control" id="q" name="q" value="{{ q|default:'' }}" placeholder="Marque, modèle, description">
+        </div>
+        <div>
+          <label class="form-label" for="marque">Marque</label>
+          <select class="form-select" id="marque" name="marque">
+            <option value="">Toutes les marques</option>
+            {% for marque in marques %}
+              <option value="{{ marque.id }}" {% if marque_selected == marque.id %}selected{% endif %}>
+                {{ marque.nom }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="form-label" for="sort">Trier par</label>
+          <select class="form-select" id="sort" name="sort">
+            <option value="">Pertinence</option>
+            <option value="prix_asc" {% if sort == 'prix_asc' %}selected{% endif %}>Prix croissant</option>
+            <option value="prix_desc" {% if sort == 'prix_desc' %}selected{% endif %}>Prix décroissant</option>
+            <option value="annee_desc" {% if sort == 'annee_desc' %}selected{% endif %}>Année (récent)</option>
+            <option value="km_asc" {% if sort == 'km_asc' %}selected{% endif %}>Kilométrage (faible)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="form-label" for="statut">Statut</label>
+          <select class="form-select" id="statut" name="statut">
+            <option value="">Tout</option>
+            <option value="disponible" {% if statut == 'disponible' %}selected{% endif %}>Disponible</option>
+            <option value="reservee" {% if statut == 'reservee' %}selected{% endif %}>Réservée</option>
+          </select>
+        </div>
+
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label" for="prix_min">Prix min</label>
+            <input class="form-control" id="prix_min" name="prix_min" type="number" min="0" value="{{ prix_min|default:'' }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label" for="prix_max">Prix max</label>
+            <input class="form-control" id="prix_max" name="prix_max" type="number" min="0" value="{{ prix_max|default:'' }}">
+          </div>
+        </div>
+
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label" for="annee_min">Année min</label>
+            <input class="form-control" id="annee_min" name="annee_min" type="number" min="1900" max="2026" value="{{ annee_min|default:'' }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label" for="annee_max">Année max</label>
+            <input class="form-control" id="annee_max" name="annee_max" type="number" min="1900" max="2026" value="{{ annee_max|default:'' }}">
+          </div>
+        </div>
+
+        <div class="d-grid gap-2 mt-1">
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-filter me-2"></i>Appliquer</button>
+          <a class="btn btn-outline-secondary" href="{% url 'liste_voitures' %}">Réinitialiser</a>
+        </div>
+      </form>
+    </div>
+  </aside>
+
+  <section class="col-lg-9">
+    {% if voitures %}
+      <div class="row g-3">
+        {% for voiture in voitures %}
+          <div class="col-md-6 col-xl-4">
+            <div class="am-card am-card-hover h-100 overflow-hidden">
+              <div class="ratio ratio-16x9 bg-light position-relative">
+                {% if voiture.est_reservee %}
+                  <span class="badge text-bg-warning position-absolute top-0 start-0 m-3">Réservée</span>
+                {% endif %}
+                <img class="am-img-cover" src="{{ voiture.image_principale.url }}"
+                     onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
+                     alt="{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}" loading="lazy">
+              </div>
+              <div class="p-3">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <div>
+                    <div class="fw-semibold">{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}</div>
+                    <div class="small am-muted">{{ voiture.annee }} • {{ voiture.kilometrage|floatformat:0 }} km</div>
+                  </div>
+                  <div class="fw-semibold text-primary am-price">{{ voiture.prix|fcfa }}</div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 mt-3">
+                  <span class="badge text-bg-light am-badge"><i class="fa-solid fa-palette me-1"></i>{{ voiture.get_couleur_display }}</span>
+                  <span class="badge text-bg-light am-badge"><i class="fa-solid fa-star me-1"></i>{{ voiture.get_etat_display }}</span>
+                </div>
+
+                <div class="d-grid gap-2 mt-3">
+                  <a class="btn btn-outline-primary" href="{% url 'detail_voiture' voiture.id %}">
+                    Voir l'annonce
+                  </a>
+                  {% if user.is_authenticated and user != voiture.vendeur %}
+                    <form method="post" action="{% url 'toggle_favori' voiture.id %}">
+                      {% csrf_token %}
+                      <button class="btn btn-outline-danger w-100" type="submit">
+                        <i class="fa-regular fa-heart me-2"></i> Favori
+                      </button>
+                    </form>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      {% if voitures.paginator.num_pages > 1 %}
+        <nav class="mt-4" aria-label="Pagination">
+          <ul class="pagination justify-content-center">
+            {% if voitures.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ voitures.previous_page_number }}&q={{ q|default:'' }}&sort={{ sort|default:'' }}&statut={{ statut|default:'' }}&marque={{ marque_selected|default:'' }}&prix_min={{ prix_min|default:'' }}&prix_max={{ prix_max|default:'' }}&annee_min={{ annee_min|default:'' }}&annee_max={{ annee_max|default:'' }}">Précédent</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">Précédent</span></li>
+            {% endif %}
+
+            {% for n in voitures.paginator.page_range %}
+              {% if n == voitures.number %}
+                <li class="page-item active"><span class="page-link">{{ n }}</span></li>
+              {% elif n >= voitures.number|add:-2 and n <= voitures.number|add:2 %}
+                <li class="page-item">
+                  <a class="page-link" href="?page={{ n }}&q={{ q|default:'' }}&sort={{ sort|default:'' }}&statut={{ statut|default:'' }}&marque={{ marque_selected|default:'' }}&prix_min={{ prix_min|default:'' }}&prix_max={{ prix_max|default:'' }}&annee_min={{ annee_min|default:'' }}&annee_max={{ annee_max|default:'' }}">{{ n }}</a>
+                </li>
+              {% endif %}
+            {% endfor %}
+
+            {% if voitures.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ voitures.next_page_number }}&q={{ q|default:'' }}&sort={{ sort|default:'' }}&statut={{ statut|default:'' }}&marque={{ marque_selected|default:'' }}&prix_min={{ prix_min|default:'' }}&prix_max={{ prix_max|default:'' }}&annee_min={{ annee_min|default:'' }}&annee_max={{ annee_max|default:'' }}">Suivant</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">Suivant</span></li>
+            {% endif %}
+          </ul>
+        </nav>
+      {% endif %}
+    {% else %}
+      <div class="alert alert-info">Aucune voiture ne correspond à vos critères.</div>
+    {% endif %}
+  </section>
+</div>
+
+<div class="offcanvas offcanvas-end" tabindex="-1" id="filtersCanvas" aria-labelledby="filtersCanvasLabel">
+  <div class="offcanvas-header">
+    <h2 class="h6 mb-0" id="filtersCanvasLabel">Filtres</h2>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fermer"></button>
+  </div>
+  <div class="offcanvas-body">
+    <form method="get" action="{% url 'liste_voitures' %}" class="vstack gap-3">
+      <div>
+        <label class="form-label" for="q_mobile">Recherche</label>
+        <input class="form-control" id="q_mobile" name="q" value="{{ q|default:'' }}" placeholder="Marque, modèle, description">
+      </div>
+      <div>
+        <label class="form-label" for="marque_mobile">Marque</label>
+        <select class="form-select" id="marque_mobile" name="marque">
+          <option value="">Toutes les marques</option>
+          {% for marque in marques %}
+            <option value="{{ marque.id }}" {% if marque_selected == marque.id %}selected{% endif %}>
+              {{ marque.nom }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label" for="sort_mobile">Trier par</label>
+        <select class="form-select" id="sort_mobile" name="sort">
+          <option value="">Pertinence</option>
+          <option value="prix_asc" {% if sort == 'prix_asc' %}selected{% endif %}>Prix croissant</option>
+          <option value="prix_desc" {% if sort == 'prix_desc' %}selected{% endif %}>Prix décroissant</option>
+          <option value="annee_desc" {% if sort == 'annee_desc' %}selected{% endif %}>Année (récent)</option>
+          <option value="km_asc" {% if sort == 'km_asc' %}selected{% endif %}>Kilométrage (faible)</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label" for="statut_mobile">Statut</label>
+        <select class="form-select" id="statut_mobile" name="statut">
+          <option value="">Tout</option>
+          <option value="disponible" {% if statut == 'disponible' %}selected{% endif %}>Disponible</option>
+          <option value="reservee" {% if statut == 'reservee' %}selected{% endif %}>Réservée</option>
+        </select>
+      </div>
+      <div class="row g-2">
+        <div class="col-6">
+          <label class="form-label" for="prix_min_mobile">Prix min</label>
+          <input class="form-control" id="prix_min_mobile" name="prix_min" type="number" min="0" value="{{ prix_min|default:'' }}">
+        </div>
+        <div class="col-6">
+          <label class="form-label" for="prix_max_mobile">Prix max</label>
+          <input class="form-control" id="prix_max_mobile" name="prix_max" type="number" min="0" value="{{ prix_max|default:'' }}">
+        </div>
+      </div>
+      <div class="row g-2">
+        <div class="col-6">
+          <label class="form-label" for="annee_min_mobile">Année min</label>
+          <input class="form-control" id="annee_min_mobile" name="annee_min" type="number" min="1900" max="2026" value="{{ annee_min|default:'' }}">
+        </div>
+        <div class="col-6">
+          <label class="form-label" for="annee_max_mobile">Année max</label>
+          <input class="form-control" id="annee_max_mobile" name="annee_max" type="number" min="1900" max="2026" value="{{ annee_max|default:'' }}">
+        </div>
+      </div>
+      <div class="d-grid gap-2 mt-1">
+        <button class="btn btn-primary" type="submit"><i class="fa-solid fa-filter me-2"></i>Appliquer</button>
+        <a class="btn btn-outline-secondary" href="{% url 'liste_voitures' %}">Réinitialiser</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

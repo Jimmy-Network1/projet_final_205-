@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+
+{% block title %}Publier une annonce - AutoMarket{% endblock %}
+{% block main_class %}container py-4{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-9">
+    <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+      <div>
+        <h1 class="h3 mb-1">Publier une annonce</h1>
+        <p class="am-muted mb-0">Ajoutez les informations essentielles. Vous pourrez compléter les photos plus tard.</p>
+      </div>
+      <a class="btn btn-outline-secondary" href="{% url 'accueil' %}"><i class="fa-solid fa-arrow-left me-2"></i>Retour</a>
+    </div>
+
+    <div class="am-card am-form-card p-4 p-md-5">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label for="marque" class="form-label">Marque</label>
+            <select class="form-select" id="marque" name="marque" required>
+              <option value="">Sélectionnez une marque</option>
+              {% for marque in marques %}
+                <option value="{{ marque.id }}">{{ marque.nom }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-6">
+            <label for="modele" class="form-label">Modèle</label>
+            <input type="text" class="form-control" id="modele" name="modele" required placeholder="Ex: Clio, Golf, 208">
+          </div>
+
+          <div class="col-md-4">
+            <label for="prix" class="form-label">Prix (FCFA)</label>
+            <input type="number" class="form-control" id="prix" name="prix" min="0" step="0.01" required>
+          </div>
+          <div class="col-md-4">
+            <label for="kilometrage" class="form-label">Kilométrage</label>
+            <input type="number" class="form-control" id="kilometrage" name="kilometrage" min="0" required>
+          </div>
+          <div class="col-md-4">
+            <label for="annee" class="form-label">Année</label>
+            <input type="number" class="form-control" id="annee" name="annee" min="1900" max="2026" required>
+          </div>
+
+          <div class="col-md-6">
+            <label for="couleur" class="form-label">Couleur</label>
+            <select class="form-select" id="couleur" name="couleur" required>
+              <option value="">Sélectionnez une couleur</option>
+              <option value="blanc">Blanc</option>
+              <option value="noir">Noir</option>
+              <option value="gris">Gris</option>
+              <option value="rouge">Rouge</option>
+              <option value="bleu">Bleu</option>
+              <option value="vert">Vert</option>
+              <option value="jaune">Jaune</option>
+              <option value="argent">Argent</option>
+              <option value="orange">Orange</option>
+              <option value="violet">Violet</option>
+              <option value="marron">Marron</option>
+              <option value="beige">Beige</option>
+            </select>
+          </div>
+
+          <div class="col-md-6">
+            <label for="etat" class="form-label">État</label>
+            <select class="form-select" id="etat" name="etat" required>
+              <option value="">Sélectionnez un état</option>
+              <option value="neuf">Neuf</option>
+              <option value="occasion">Occasion</option>
+              <option value="reconditionne">Reconditionné</option>
+            </select>
+          </div>
+
+          <div class="col-12">
+            <label for="description" class="form-label">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="6" required
+                      placeholder="Décrivez l'état, les options, l'historique, etc."></textarea>
+          </div>
+
+          <div class="col-12">
+            <label for="image" class="form-label">Photo principale</label>
+            <input type="file" class="form-control" id="image" name="image" accept="image/*">
+            <div class="form-text">Vous pourrez ajouter de meilleures photos ensuite.</div>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap justify-content-between gap-2 mt-4">
+          <button type="submit" class="btn btn-primary btn-lg">
+            <i class="fa-solid fa-paper-plane me-2"></i> Publier l'annonce
+          </button>
+          <a href="{% url 'accueil' %}" class="btn btn-outline-secondary btn-lg">Annuler</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
