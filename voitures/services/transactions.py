@@ -44,7 +44,7 @@ def expire_stale_purchase_requests(*, ttl_hours: int | None = None) -> int:
         return 0
 
     car_ids = list(stale.values_list("voiture_id", flat=True).distinct())
-    updated = stale.update(statut="annulee")
+    updated = stale.update(statut="annulee", date_mise_a_jour=timezone.now())
 
     if car_ids:
         Voiture.objects.filter(id__in=car_ids, est_reservee=True).exclude(
@@ -107,7 +107,9 @@ def cancel_purchase_request(*, transaction_id: int, buyer: User) -> Transaction:
 
     with db_transaction.atomic():
         locked = Voiture.objects.select_for_update().get(id=trx.voiture_id)
-        Transaction.objects.filter(id=trx.id, statut="en_attente").update(statut="annulee")
+        Transaction.objects.filter(id=trx.id, statut="en_attente").update(
+            statut="annulee", date_mise_a_jour=timezone.now()
+        )
         if not Transaction.objects.filter(voiture=locked, statut="en_attente").exists():
             locked.est_reservee = False
             locked.save(update_fields=["est_reservee"])
@@ -125,7 +127,9 @@ def refuse_purchase_request(*, transaction_id: int, seller: User) -> Transaction
 
     with db_transaction.atomic():
         locked = Voiture.objects.select_for_update().get(id=trx.voiture_id)
-        Transaction.objects.filter(id=trx.id, statut="en_attente").update(statut="annulee")
+        Transaction.objects.filter(id=trx.id, statut="en_attente").update(
+            statut="annulee", date_mise_a_jour=timezone.now()
+        )
         if not Transaction.objects.filter(voiture=locked, statut="en_attente").exists():
             locked.est_reservee = False
             locked.save(update_fields=["est_reservee"])
@@ -144,13 +148,18 @@ def confirm_sale(*, transaction_id: int, seller: User) -> Transaction:
     with db_transaction.atomic():
         locked = Voiture.objects.select_for_update().get(id=trx.voiture_id)
 
-        Transaction.objects.filter(id=trx.id, statut="en_attente").update(statut="confirmee")
+        now = timezone.now()
+        Transaction.objects.filter(id=trx.id, statut="en_attente").update(
+            statut="confirmee",
+            date_confirmation=now,
+            date_mise_a_jour=now,
+        )
         locked.est_vendue = True
         locked.est_reservee = False
         locked.save(update_fields=["est_vendue", "est_reservee"])
 
         Transaction.objects.filter(voiture=locked, statut="en_attente").exclude(id=trx.id).update(
-            statut="annulee"
+            statut="annulee", date_mise_a_jour=now
         )
 
     trx.refresh_from_db()

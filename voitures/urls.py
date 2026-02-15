@@ -25,6 +25,11 @@ urlpatterns = [
     path('transaction/<int:transaction_id>/confirmer/', views.confirmer_vente, name='confirmer_vente'),
     path('transaction/<int:transaction_id>/annuler/', views.annuler_transaction, name='annuler_transaction'),
     path('transaction/<int:transaction_id>/refuser/', views.refuser_transaction, name='refuser_transaction'),
+    path(
+        "transaction/<int:transaction_id>/recu/<str:role>/",
+        views.telecharger_recu_transaction,
+        name="telecharger_recu_transaction",
+    ),
     
     path('inscription/', views.inscription, name='inscription'),
     path('connexion/', views.connexion, name='connexion'),

@@ -14,7 +14,7 @@ import os
 from decimal import Decimal, InvalidOperation
 from .models import Conversation, Marque, Modele, Voiture, Favori, Transaction, Avis, Message, Notification
 from .forms import InscriptionForm, AvisForm
-from .services import messaging, transactions
+from .services import messaging, receipts, transactions
 
 
 def _validate_uploaded_image(uploaded_file):
@@ -109,6 +109,11 @@ def liste_voitures(request):
     prix_max = request.GET.get('prix_max')
     annee_min = request.GET.get('annee_min')
     annee_max = request.GET.get('annee_max')
+    etats = request.GET.getlist("etat") or []
+    if len(etats) == 1 and "," in etats[0]:
+        etats = [part.strip() for part in etats[0].split(",") if part.strip()]
+    allowed_etats = {key for key, _ in Voiture.ETAT_CHOICES}
+    etats_selected = [e for e in etats if e in allowed_etats]
 
     if q:
         voitures_list = voitures_list.filter(
@@ -132,6 +137,9 @@ def liste_voitures(request):
     
     if annee_max:
         voitures_list = voitures_list.filter(annee__lte=annee_max)
+
+    if etats_selected:
+        voitures_list = voitures_list.filter(etat__in=etats_selected)
 
     if statut == "reservee":
         voitures_list = voitures_list.filter(est_reservee=True)
@@ -167,6 +175,7 @@ def liste_voitures(request):
         'q': q,
         'sort': sort,
         'statut': statut,
+        "etat_selected": etats_selected,
     }
     return render(request, 'voitures/liste_voitures.html', context)
 
@@ -872,6 +881,38 @@ def mes_ventes(request):
     
     context = {'ventes': ventes}
     return render(request, 'voitures/mes_ventes.html', context)
+
+
+@login_required
+def telecharger_recu_transaction(request, transaction_id, role):
+    if role not in {"buyer", "seller"}:
+        raise Http404
+
+    trx = get_object_or_404(
+        Transaction.objects.select_related(
+            "voiture__modele__marque",
+            "voiture__modele",
+            "acheteur",
+            "vendeur",
+        ),
+        id=transaction_id,
+    )
+
+    if trx.statut not in {"confirmee", "terminee"}:
+        raise Http404
+
+    if not request.user.is_staff:
+        if role == "buyer" and trx.acheteur_id != request.user.id:
+            raise Http404
+        if role == "seller" and trx.vendeur_id != request.user.id:
+            raise Http404
+
+    pdf_bytes = receipts.build_transaction_receipt(transaction=trx, role=role)
+    filename = f"recu_transaction_{trx.id}_{role}.pdf"
+
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
 
 @login_required
 def confirmer_vente(request, transaction_id):

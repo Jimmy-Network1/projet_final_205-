@@ -68,6 +68,26 @@ class TransactionFlowTests(TestCase):
         resp = self.client.get(reverse("deconnexion"))
         self.assertEqual(resp.status_code, 405)
 
+    def test_confirm_sale_sets_confirmation_date(self):
+        self.client.force_login(self.seller)
+        resp = self.client.post(reverse("confirmer_vente", args=[self.trx.id]))
+        self.assertEqual(resp.status_code, 302)
+
+        self.trx.refresh_from_db()
+        self.assertEqual(self.trx.statut, "confirmee")
+        self.assertIsNotNone(self.trx.date_confirmation)
+
+    def test_receipt_pdf_download_for_buyer(self):
+        self.client.force_login(self.seller)
+        self.client.post(reverse("confirmer_vente", args=[self.trx.id]))
+        self.trx.refresh_from_db()
+
+        self.client.force_login(self.buyer)
+        resp = self.client.get(reverse("telecharger_recu_transaction", args=[self.trx.id, "buyer"]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        self.assertTrue(resp.content.startswith(b"%PDF"))
+
 
 class AuthRedirectTests(TestCase):
     def setUp(self):

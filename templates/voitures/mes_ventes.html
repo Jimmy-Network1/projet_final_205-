@@ -51,7 +51,13 @@
                   <span class="badge text-bg-secondary">{{ t.get_statut_display_fr }}</span>
                 {% endif %}
               </td>
-              <td class="text-nowrap">{{ t.date_transaction|date:"d/m/Y H:i" }}</td>
+              <td class="text-nowrap">
+                {% if t.date_confirmation %}
+                  {{ t.date_confirmation|date:"d/m/Y H:i" }}
+                {% else %}
+                  {{ t.date_transaction|date:"d/m/Y H:i" }}
+                {% endif %}
+              </td>
               <td class="text-end">
                 {% if t.statut == 'en_attente' %}
                   <div class="d-inline-flex gap-2">
@@ -64,6 +70,10 @@
                       <button class="btn btn-sm btn-outline-danger" type="submit">Refuser</button>
                     </form>
                   </div>
+                {% elif t.statut == 'confirmee' or t.statut == 'terminee' %}
+                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'telecharger_recu_transaction' t.id 'seller' %}">
+                    <i class="fa-regular fa-file-pdf me-1"></i> Reçu PDF
+                  </a>
                 {% else %}
                   <span class="small am-muted">—</span>
                 {% endif %}

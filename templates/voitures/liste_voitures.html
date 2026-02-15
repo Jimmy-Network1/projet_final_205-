@@ -17,6 +17,15 @@
         <span class="mx-2">•</span>{{ voitures.paginator.count }} résultat{{ voitures.paginator.count|pluralize }}
       {% endif %}
     </div>
+    <div class="mt-2 d-flex flex-wrap gap-2">
+      <div class="btn-group btn-group-sm" role="group" aria-label="Type de véhicule">
+        <button class="btn btn-outline-secondary {% if not etat_selected %}active{% endif %}" type="button" data-etat-preset="">Tous</button>
+        <button class="btn btn-outline-secondary {% if etat_selected|length == 1 and 'neuf' in etat_selected %}active{% endif %}" type="button" data-etat-preset="neuf">Neuf</button>
+        <button class="btn btn-outline-secondary {% if etat_selected|length == 1 and 'occasion' in etat_selected %}active{% endif %}" type="button" data-etat-preset="occasion">Occasion</button>
+        <button class="btn btn-outline-secondary {% if etat_selected|length == 1 and 'reconditionne' in etat_selected %}active{% endif %}" type="button" data-etat-preset="reconditionne">Reconditionné</button>
+      </div>
+      <div class="small am-muted align-self-center">Astuce: combinez plusieurs critères dans les filtres.</div>
+    </div>
   </div>
 
   <div class="d-flex gap-2">
@@ -36,7 +45,7 @@
   <aside class="col-lg-3">
     <div class="am-card p-3 p-lg-4 d-none d-lg-block">
       <h2 class="h6 mb-3">Filtres</h2>
-      <form method="get" action="{% url 'liste_voitures' %}" class="vstack gap-3">
+      <form method="get" action="{% url 'liste_voitures' %}" class="vstack gap-3" data-ajax-filters>
         <div>
           <label class="form-label" for="q">Recherche</label>
           <input class="form-control" id="q" name="q" value="{{ q|default:'' }}" placeholder="Marque, modèle, description">
@@ -73,6 +82,27 @@
           </select>
         </div>
 
+        <div>
+          <div class="form-label mb-2">Type</div>
+          <div class="vstack gap-2">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="etat" id="etat_neuf" value="neuf"
+                     {% if 'neuf' in etat_selected %}checked{% endif %}>
+              <label class="form-check-label" for="etat_neuf">Neuf</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="etat" id="etat_occasion" value="occasion"
+                     {% if 'occasion' in etat_selected %}checked{% endif %}>
+              <label class="form-check-label" for="etat_occasion">Occasion</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="etat" id="etat_reconditionne" value="reconditionne"
+                     {% if 'reconditionne' in etat_selected %}checked{% endif %}>
+              <label class="form-check-label" for="etat_reconditionne">Reconditionné</label>
+            </div>
+          </div>
+        </div>
+
         <div class="row g-2">
           <div class="col-6">
             <label class="form-label" for="prix_min">Prix min</label>
@@ -104,6 +134,7 @@
   </aside>
 
   <section class="col-lg-9">
+    <div id="results">
     {% if voitures %}
       <div class="row g-3">
         {% for voiture in voitures %}
@@ -155,7 +186,7 @@
           <ul class="pagination justify-content-center">
             {% if voitures.has_previous %}
               <li class="page-item">
-                <a class="page-link" href="?page={{ voitures.previous_page_number }}&q={{ q|default:'' }}&sort={{ sort|default:'' }}&statut={{ statut|default:'' }}&marque={{ marque_selected|default:'' }}&prix_min={{ prix_min|default:'' }}&prix_max={{ prix_max|default:'' }}&annee_min={{ annee_min|default:'' }}&annee_max={{ annee_max|default:'' }}">Précédent</a>
+                <a class="page-link" href="?page={{ voitures.previous_page_number }}&q={{ q|default:'' }}&sort={{ sort|default:'' }}&statut={{ statut|default:'' }}&marque={{ marque_selected|default:'' }}{% for e in etat_selected %}&etat={{ e }}{% endfor %}&prix_min={{ prix_min|default:'' }}&prix_max={{ prix_max|default:'' }}&annee_min={{ annee_min|default:'' }}&annee_max={{ annee_max|default:'' }}">Précédent</a>
               </li>
             {% else %}
               <li class="page-item disabled"><span class="page-link">Précédent</span></li>
@@ -166,14 +197,14 @@
                 <li class="page-item active"><span class="page-link">{{ n }}</span></li>
               {% elif n >= voitures.number|add:-2 and n <= voitures.number|add:2 %}
                 <li class="page-item">
-                  <a class="page-link" href="?page={{ n }}&q={{ q|default:'' }}&sort={{ sort|default:'' }}&statut={{ statut|default:'' }}&marque={{ marque_selected|default:'' }}&prix_min={{ prix_min|default:'' }}&prix_max={{ prix_max|default:'' }}&annee_min={{ annee_min|default:'' }}&annee_max={{ annee_max|default:'' }}">{{ n }}</a>
+                  <a class="page-link" href="?page={{ n }}&q={{ q|default:'' }}&sort={{ sort|default:'' }}&statut={{ statut|default:'' }}&marque={{ marque_selected|default:'' }}{% for e in etat_selected %}&etat={{ e }}{% endfor %}&prix_min={{ prix_min|default:'' }}&prix_max={{ prix_max|default:'' }}&annee_min={{ annee_min|default:'' }}&annee_max={{ annee_max|default:'' }}">{{ n }}</a>
                 </li>
               {% endif %}
             {% endfor %}
 
             {% if voitures.has_next %}
               <li class="page-item">
-                <a class="page-link" href="?page={{ voitures.next_page_number }}&q={{ q|default:'' }}&sort={{ sort|default:'' }}&statut={{ statut|default:'' }}&marque={{ marque_selected|default:'' }}&prix_min={{ prix_min|default:'' }}&prix_max={{ prix_max|default:'' }}&annee_min={{ annee_min|default:'' }}&annee_max={{ annee_max|default:'' }}">Suivant</a>
+                <a class="page-link" href="?page={{ voitures.next_page_number }}&q={{ q|default:'' }}&sort={{ sort|default:'' }}&statut={{ statut|default:'' }}&marque={{ marque_selected|default:'' }}{% for e in etat_selected %}&etat={{ e }}{% endfor %}&prix_min={{ prix_min|default:'' }}&prix_max={{ prix_max|default:'' }}&annee_min={{ annee_min|default:'' }}&annee_max={{ annee_max|default:'' }}">Suivant</a>
               </li>
             {% else %}
               <li class="page-item disabled"><span class="page-link">Suivant</span></li>
@@ -184,6 +215,7 @@
     {% else %}
       <div class="alert alert-info">Aucune voiture ne correspond à vos critères.</div>
     {% endif %}
+    </div>
   </section>
 </div>
 
@@ -193,7 +225,7 @@
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fermer"></button>
   </div>
   <div class="offcanvas-body">
-    <form method="get" action="{% url 'liste_voitures' %}" class="vstack gap-3">
+    <form method="get" action="{% url 'liste_voitures' %}" class="vstack gap-3" data-ajax-filters>
       <div>
         <label class="form-label" for="q_mobile">Recherche</label>
         <input class="form-control" id="q_mobile" name="q" value="{{ q|default:'' }}" placeholder="Marque, modèle, description">
@@ -227,6 +259,27 @@
           <option value="reservee" {% if statut == 'reservee' %}selected{% endif %}>Réservée</option>
         </select>
       </div>
+
+      <div>
+        <div class="form-label mb-2">Type</div>
+        <div class="vstack gap-2">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="etat" id="etat_neuf_mobile" value="neuf"
+                   {% if 'neuf' in etat_selected %}checked{% endif %}>
+            <label class="form-check-label" for="etat_neuf_mobile">Neuf</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="etat" id="etat_occasion_mobile" value="occasion"
+                   {% if 'occasion' in etat_selected %}checked{% endif %}>
+            <label class="form-check-label" for="etat_occasion_mobile">Occasion</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="etat" id="etat_reconditionne_mobile" value="reconditionne"
+                   {% if 'reconditionne' in etat_selected %}checked{% endif %}>
+            <label class="form-check-label" for="etat_reconditionne_mobile">Reconditionné</label>
+          </div>
+        </div>
+      </div>
       <div class="row g-2">
         <div class="col-6">
           <label class="form-label" for="prix_min_mobile">Prix min</label>
@@ -254,4 +307,84 @@
     </form>
   </div>
 </div>
+
+{% block extra_js %}
+<script>
+  (function () {
+    const resultsSelector = "#results";
+    let resultsRoot = document.querySelector(resultsSelector);
+    if (!resultsRoot) return;
+    const forms = Array.from(document.querySelectorAll("form[data-ajax-filters]"));
+    if (!forms.length) return;
+
+    function buildUrlFromForm(form, extraParams) {
+      const url = new URL(form.action, window.location.origin);
+      const params = new URLSearchParams(new FormData(form));
+      if (extraParams) {
+        for (const [k, v] of extraParams) params.set(k, v);
+      }
+      url.search = params.toString();
+      return url.toString();
+    }
+
+    let pending = null;
+    function fetchAndSwap(url, pushState) {
+      if (pending) pending.abort();
+      pending = new AbortController();
+      fetch(url, { signal: pending.signal, headers: { "X-Requested-With": "fetch" } })
+        .then(r => r.text())
+        .then(html => {
+          const doc = new DOMParser().parseFromString(html, "text/html");
+          const next = doc.querySelector(resultsSelector);
+          if (!next) return;
+          resultsRoot.replaceWith(next);
+          resultsRoot = next;
+          if (pushState) window.history.pushState({}, "", url);
+        })
+        .catch(() => {});
+    }
+
+    let timer = null;
+    function scheduleSubmit(form) {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const url = buildUrlFromForm(form);
+        fetchAndSwap(url, true);
+      }, 250);
+    }
+
+    for (const form of forms) {
+      form.addEventListener("change", () => scheduleSubmit(form));
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const url = buildUrlFromForm(form);
+        fetchAndSwap(url, true);
+      });
+    }
+
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-etat-preset]");
+      if (!btn) return;
+      const preset = (btn.getAttribute("data-etat-preset") || "").trim();
+      for (const form of forms) {
+        const boxes = Array.from(form.querySelectorAll("input[type=checkbox][name=etat]"));
+        for (const box of boxes) box.checked = preset ? box.value === preset : false;
+      }
+      scheduleSubmit(forms[0]);
+    });
+
+    document.addEventListener("click", (e) => {
+      const link = e.target.closest(resultsSelector + " a.page-link");
+      if (!link) return;
+      const href = link.getAttribute("href");
+      if (!href || href.startsWith("#")) return;
+      e.preventDefault();
+      const url = new URL(href, window.location.href).toString();
+      fetchAndSwap(url, true);
+    });
+
+    window.addEventListener("popstate", () => fetchAndSwap(window.location.href, false));
+  })();
+</script>
+{% endblock %}
 {% endblock %}
