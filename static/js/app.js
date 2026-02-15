@@ -54,3 +54,217 @@ document.addEventListener("click", (event) => {
 });
 
 initTheme();
+
+// ======================
+// Filtres (listings)
+// ======================
+
+// Retire un ou plusieurs paramètres de la query-string puis recharge
+document.addEventListener("click", (event) => {
+  const chip = event.target.closest("[data-remove-filter]");
+  if (!chip) return;
+  const paramsToRemove = (chip.getAttribute("data-remove-filter") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!paramsToRemove.length) return;
+
+  const url = new URL(window.location.href);
+  paramsToRemove.forEach((p) => url.searchParams.delete(p));
+  // Si la page était paginée, on revient à la page 1
+  url.searchParams.delete("page");
+  window.location.href = url.toString();
+});
+
+// Boutons de presets pour remplir rapidement le formulaire de filtres (mobile/offcanvas)
+document.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-quick-filter]");
+  if (!btn) return;
+
+  const formSelector = btn.getAttribute("data-form") || "#filtersFormMobile";
+  const form = document.querySelector(formSelector);
+  if (!form) return;
+
+  const presets = (btn.getAttribute("data-quick-filter") || "").split(",");
+  presets.forEach((pair) => {
+    const [name, value] = pair.split("=");
+    if (!name) return;
+    const input = form.querySelector(`[name="${name}"]`);
+    if (input) input.value = value ?? "";
+  });
+
+  // Remettre la pagination à 1
+  const pageInput = form.querySelector('[name="page"]');
+  if (pageInput) pageInput.value = "";
+
+  form.submit();
+});
+
+// ======================
+// Feedback & formulaires
+// ======================
+
+// Auto-dismiss des alertes Django (messages)
+document.addEventListener("DOMContentLoaded", () => {
+  const alerts = document.querySelectorAll(".alert[data-autohide]");
+  alerts.forEach((alert) => {
+    const timeout = parseInt(alert.getAttribute("data-autohide"), 10) || 4000;
+    setTimeout(() => {
+      if (alert.classList.contains("show")) alert.classList.remove("show");
+      alert.classList.add("fade");
+      setTimeout(() => alert.remove(), 400);
+    }, timeout);
+  });
+});
+
+// Boutons de formulaire avec état "loading"
+document.addEventListener("submit", (event) => {
+  const form = event.target.closest("form");
+  if (!form) return;
+  const submit = form.querySelector("[data-loading]");
+  if (!submit) return;
+  submit.disabled = true;
+  const original = submit.innerHTML;
+  submit.dataset.originalLabel = original;
+  submit.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Envoi…';
+});
+
+// Si navigation AJAX n'existe pas, on réactive après retour navigateur
+window.addEventListener("pageshow", () => {
+  document.querySelectorAll("[data-loading][disabled]").forEach((btn) => {
+    if (btn.dataset.originalLabel) btn.innerHTML = btn.dataset.originalLabel;
+    btn.disabled = false;
+  });
+});
+
+// Bootstrap toasts (messages Django)
+document.addEventListener("DOMContentLoaded", () => {
+  const toasts = document.querySelectorAll(".toast");
+  if (!toasts.length) return;
+  toasts.forEach((el) => {
+    const toast = bootstrap.Toast.getOrCreateInstance(el);
+    toast.show();
+  });
+});
+
+// Helpers de formatage (prix / km) et compteur de caractères
+document.addEventListener("DOMContentLoaded", () => {
+  const priceInput = document.querySelector("[data-price-display]");
+  const priceDisplay = document.querySelector("#priceDisplay");
+  const kmInput = document.querySelector("[data-km-display]");
+  const kmDisplay = document.querySelector("#kmDisplay");
+  const descInput = document.querySelector("[data-count-target]");
+  const descCounter = document.querySelector("#descCounter");
+
+  const fmt = (n) =>
+    new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(n);
+
+  if (priceInput && priceDisplay) {
+    const update = () => {
+      const val = parseFloat(priceInput.value || "0");
+      priceDisplay.textContent = val > 0 ? `${fmt(val)} FCFA` : "—";
+    };
+    priceInput.addEventListener("input", update);
+    update();
+  }
+
+  if (kmInput && kmDisplay) {
+    const update = () => {
+      const val = parseFloat(kmInput.value || "0");
+      kmDisplay.textContent = val > 0 ? `${fmt(val)} km` : "—";
+    };
+    kmInput.addEventListener("input", update);
+    update();
+  }
+
+  if (descInput && descCounter) {
+    const update = () => {
+      const max = descInput.getAttribute("maxlength");
+      const len = descInput.value.length;
+      descCounter.textContent = max ? `${len}/${max}` : `${len} caractères`;
+    };
+    descInput.addEventListener("input", update);
+    update();
+  }
+});
+
+// ======================
+// Ajax helpers (favoris, réservations)
+// ======================
+
+function getCsrfToken() {
+  const match = document.cookie.match(/csrftoken=([^;]+)/);
+  return match ? match[1] : "";
+}
+
+function showToast(message, variant = "info") {
+  if (!message) return;
+  const container = document.getElementById("toastContainer") || (() => {
+    const div = document.createElement("div");
+    div.className = "toast-container position-fixed bottom-0 end-0 p-3";
+    div.id = "toastContainer";
+    document.body.appendChild(div);
+    return div;
+  })();
+
+  const toastEl = document.createElement("div");
+  toastEl.className = `toast align-items-center text-bg-${variant} border-0 shadow`;
+  toastEl.setAttribute("role", "alert");
+  toastEl.innerHTML = `
+    <div class="d-flex">
+      <div class="toast-body">${message}</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fermer"></button>
+    </div>`;
+
+  container.appendChild(toastEl);
+  const toast = bootstrap.Toast.getOrCreateInstance(toastEl);
+  toast.show();
+  toastEl.addEventListener("hidden.bs.toast", () => toastEl.remove());
+}
+
+document.addEventListener("submit", async (event) => {
+  const form = event.target.closest("form[data-ajax]");
+  if (!form) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  const submitBtn = form.querySelector("button[type='submit']");
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    const res = await fetch(form.action, {
+      method: form.method || "POST",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+        "X-CSRFToken": getCsrfToken(),
+      },
+      body: new FormData(form),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) {
+      showToast(data.error || "Action impossible.", "danger");
+    } else {
+      showToast(data.message || "Action réalisée.", "success");
+      // Mise à jour UI favoris
+      if (form.querySelector(".js-favori-btn") && typeof data.favori === "boolean") {
+        const btn = form.querySelector(".js-favori-btn");
+        btn.innerHTML = data.favori
+          ? '<i class="fa-solid fa-heart me-2"></i> Retirer des favoris'
+          : '<i class="fa-regular fa-heart me-2"></i> Ajouter aux favoris';
+      }
+      // Fermer le collapse réservation si succès
+      if (form.id === "reservationForm" || form.closest("#reservationForm")) {
+        const collapseEl = document.getElementById("reservationForm");
+        if (collapseEl) {
+          const coll = bootstrap.Collapse.getOrCreateInstance(collapseEl, {toggle: false});
+          coll.hide();
+          form.reset();
+        }
+      }
+    }
+  } catch (err) {
+    showToast("Erreur réseau.", "danger");
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+});

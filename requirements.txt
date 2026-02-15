@@ -1,7 +1,8 @@
 # requirements.txt - Version compatible Windows
 Django==4.2.7
 gunicorn==21.2.0
-psycopg2-binary==2.9.9
+# psycopg2-binary 2.9.9 doesn't compile on Python 3.13; use psycopg v3 binary wheel instead.
+psycopg[binary]==3.3.2
 Pillow==12.1.0 # Version plus ancienne mais stable
 python-dotenv==1.0.0
 whitenoise==6.6.0

@@ -20,6 +20,6 @@ urlpatterns = [
     path('', include('voitures.urls')),  # Ajoutez cette ligne
 ]
 
-# Pour servir les fichiers médias (utile en démo / hébergement simple)
-if getattr(settings, "SERVE_MEDIA", False):
+# Pour servir les fichiers médias en développement
+if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

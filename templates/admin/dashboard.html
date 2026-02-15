@@ -11,12 +11,7 @@
     <h1 class="h3 mb-1">Dashboard</h1>
     <p class="am-muted mb-0">Vue d'ensemble de l'activité (admin).</p>
   </div>
-  <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary" href="{% url 'accueil' %}">Accueil</a>
-    <a class="btn btn-outline-primary" href="{% url 'dashboard_marques' %}">
-      <i class="fa-regular fa-rectangle-list me-2"></i>Marques
-    </a>
-  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'accueil' %}">Accueil</a>
 </div>
 
 <div class="row g-3 mb-4">
@@ -73,7 +68,12 @@
                     <div class="small am-muted">{{ t.acheteur.username }} → {{ t.vendeur.username }}</div>
                   </td>
                   <td class="fw-semibold text-primary am-price">{{ t.prix_final|fcfa }}</td>
-                  <td><span class="badge text-bg-light am-badge">{{ t.get_statut_display_fr }}</span></td>
+                  <td>
+                    {% if t.statut == 'en_attente' %}<span class="badge text-bg-warning">En attente</span>
+                    {% elif t.statut == 'confirmee' %}<span class="badge text-bg-success">Confirmée</span>
+                    {% elif t.statut == 'annulee' %}<span class="badge text-bg-secondary">Annulée</span>
+                    {% else %}<span class="badge text-bg-light am-badge">{{ t.get_statut_display }}</span>{% endif %}
+                  </td>
                   <td class="text-nowrap">{{ t.date_transaction|date:"d/m/Y H:i" }}</td>
                 </tr>
               {% endfor %}
@@ -112,7 +112,12 @@
                     <div class="small am-muted">{{ t.acheteur.username }} → {{ t.vendeur.username }}</div>
                   </td>
                   <td class="fw-semibold text-primary am-price">{{ t.prix_final|fcfa }}</td>
-                  <td><span class="badge text-bg-light am-badge">{{ t.get_statut_display_fr }}</span></td>
+                  <td>
+                    {% if t.statut == 'en_attente' %}<span class="badge text-bg-warning">En attente</span>
+                    {% elif t.statut == 'confirmee' %}<span class="badge text-bg-success">Confirmée</span>
+                    {% elif t.statut == 'annulee' %}<span class="badge text-bg-secondary">Annulée</span>
+                    {% else %}<span class="badge text-bg-light am-badge">{{ t.get_statut_display }}</span>{% endif %}
+                  </td>
                   <td class="text-nowrap">{{ t.date_transaction|date:"d/m/Y H:i" }}</td>
                 </tr>
               {% endfor %}
@@ -128,95 +133,6 @@
   </div>
 
   <div class="col-lg-5">
-    <div class="am-card overflow-hidden mb-4">
-      <div class="p-3 p-md-4 border-bottom d-flex align-items-center justify-content-between gap-2">
-        <div class="fw-semibold">Annonces à valider</div>
-        <span class="badge text-bg-info">{{ voitures_a_valider|length }}</span>
-      </div>
-      {% if voitures_a_valider %}
-        <div class="list-group list-group-flush">
-          {% for v in voitures_a_valider %}
-            <div class="list-group-item">
-              <div class="d-flex align-items-center gap-3">
-              <div class="am-car-media" style="width:80px; height:56px;">
-                <img class="am-img-cover" src="{{ v.image_principale.url }}"
-                     onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
-                     alt="{{ v.modele.marque.nom }} {{ v.modele.nom }}">
-              </div>
-              <div class="flex-grow-1">
-                <div class="fw-semibold">{{ v.modele.marque.nom }} {{ v.modele.nom }}</div>
-                <div class="small am-muted">{{ v.vendeur.username }} • {{ v.date_ajout|date:"d/m/Y H:i" }}</div>
-              </div>
-              <a class="btn btn-sm btn-outline-secondary" href="{% url 'detail_voiture' v.id %}">Voir</a>
-              </div>
-
-              <div class="d-flex flex-wrap gap-2 mt-3">
-                <form method="post" action="{% url 'moderer_annonce' v.id %}">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="approve">
-                  <button class="btn btn-sm btn-success" type="submit">
-                    <i class="fa-solid fa-check me-1"></i> Valider
-                  </button>
-                </form>
-
-                <form method="post" action="{% url 'moderer_annonce' v.id %}" class="d-flex flex-wrap gap-2 flex-grow-1">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="reject">
-                  <input class="form-control form-control-sm" name="reason" placeholder="Motif de refus (obligatoire)">
-                  <button class="btn btn-sm btn-outline-danger" type="submit">
-                    <i class="fa-solid fa-xmark me-1"></i> Refuser
-                  </button>
-                </form>
-              </div>
-            </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <div class="p-4">
-          <div class="alert alert-info mb-0">Aucune annonce en attente.</div>
-        </div>
-      {% endif %}
-    </div>
-
-    <div class="am-card overflow-hidden mb-4">
-      <div class="p-3 p-md-4 border-bottom d-flex align-items-center justify-content-between gap-2">
-        <div class="fw-semibold">Avis à valider</div>
-        <span class="badge text-bg-info">{{ avis_a_valider|length }}</span>
-      </div>
-      {% if avis_a_valider %}
-        <div class="list-group list-group-flush">
-          {% for a in avis_a_valider %}
-            <div class="list-group-item">
-              <div class="d-flex align-items-start justify-content-between gap-2">
-                <div>
-                  <div class="fw-semibold">Annonce #{{ a.voiture.id }} — {{ a.voiture.modele.marque.nom }} {{ a.voiture.modele.nom }}</div>
-                  <div class="small am-muted">Par {{ a.utilisateur.username }} • {{ a.date_publication|date:"d/m/Y H:i" }}</div>
-                </div>
-                <a class="btn btn-sm btn-outline-secondary" href="{% url 'detail_voiture' a.voiture.id %}">Voir</a>
-              </div>
-              <div class="mt-2">{{ a.commentaire }}</div>
-              <div class="d-flex gap-2 mt-3">
-                <form method="post" action="{% url 'moderer_avis' a.id %}">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="approve">
-                  <button class="btn btn-sm btn-success" type="submit">Approuver</button>
-                </form>
-                <form method="post" action="{% url 'moderer_avis' a.id %}">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="reject">
-                  <button class="btn btn-sm btn-outline-danger" type="submit">Refuser</button>
-                </form>
-              </div>
-            </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <div class="p-4">
-          <div class="alert alert-info mb-0">Aucun avis en attente.</div>
-        </div>
-      {% endif %}
-    </div>
-
     <div class="am-card overflow-hidden">
       <div class="p-3 p-md-4 border-bottom">
         <div class="fw-semibold">Dernières annonces</div>
@@ -234,12 +150,7 @@
                 <div class="fw-semibold">{{ v.modele.marque.nom }} {{ v.modele.nom }}</div>
                 <div class="small am-muted">{{ v.annee }} • {{ v.kilometrage|floatformat:0 }} km</div>
               </div>
-              <div class="text-end">
-                <div class="fw-semibold text-primary am-price">{{ v.prix|fcfa }}</div>
-                {% if v.moderation_status != 'approved' %}
-                  <span class="badge text-bg-info">En validation</span>
-                {% endif %}
-              </div>
+              <div class="fw-semibold text-primary am-price">{{ v.prix|fcfa }}</div>
             </a>
           {% endfor %}
         </div>

@@ -33,8 +33,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "source_dir",
             nargs="?",
-            default="logo",
-            help="Dossier qui contient les logos (par défaut: 'logo').",
+            default="LES IMAGES",
+            help="Dossier qui contient les logos (par défaut: 'LES IMAGES').",
         )
         parser.add_argument(
             "--dry-run",
@@ -127,3 +127,4 @@ class Command(BaseCommand):
                 f"Terminé. Liés: {matched}, ignorés: {skipped}, non associés: {len(missing)}"
             )
         )
+

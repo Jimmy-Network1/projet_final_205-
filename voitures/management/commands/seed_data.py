@@ -4,7 +4,6 @@ import django
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from voitures.models import Marque, Modele, Voiture
-from django.utils import timezone
 import datetime
 
 class Command(BaseCommand):
@@ -281,9 +280,6 @@ class Command(BaseCommand):
                 defaults=data
             )
             if created:
-                voiture.moderation_status = "approved"
-                voiture.moderated_at = timezone.now()
-                voiture.save(update_fields=["moderation_status", "moderated_at"])
                 self.stdout.write(f"✓ Voiture {voiture} créée")
         
         self.stdout.write(self.style.SUCCESS('✓ Données par défaut créées avec succès !'))

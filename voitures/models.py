@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 import os
+from datetime import datetime
 
 class Marque(models.Model):
     nom = models.CharField(max_length=100, unique=True)
@@ -84,12 +85,6 @@ class Voiture(models.Model):
         ('marron', 'Marron'),
         ('beige', 'Beige'),
     ]
-
-    MODERATION_STATUS_CHOICES = [
-        ("pending", "En attente"),
-        ("approved", "Approuvée"),
-        ("rejected", "Refusée"),
-    ]
     
     modele = models.ForeignKey(Modele, on_delete=models.CASCADE, related_name='voitures')
     prix = models.DecimalField(max_digits=10, decimal_places=2)
@@ -105,21 +100,10 @@ class Voiture(models.Model):
     vendeur = models.ForeignKey(User, on_delete=models.CASCADE, related_name='voitures_vendues')
     est_vendue = models.BooleanField(default=False)
     est_reservee = models.BooleanField(default=False)
-    moderation_status = models.CharField(
-        max_length=12,
-        choices=MODERATION_STATUS_CHOICES,
-        default="pending",
-        db_index=True,
-    )
-    moderation_reason = models.TextField(blank=True)
-    moderated_at = models.DateTimeField(blank=True, null=True)
-    moderated_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True,
-        related_name="voitures_moderees",
-    )
+    est_louee = models.BooleanField(default=False)
+    localisation = models.CharField(max_length=120, default="Dépôt")
+    carburant_niveau = models.PositiveSmallIntegerField(default=100)
+    gps_tracking_url = models.URLField(blank=True, default="")
     image_principale = models.ImageField(
         upload_to='voitures/', 
         default='voitures/default.jpg',
@@ -138,9 +122,6 @@ class Voiture(models.Model):
     def incrementer_vue(self):
         self.vue += 1
         self.save(update_fields=['vue'])
-
-    def est_approuvee(self) -> bool:
-        return self.moderation_status == "approved"
     
     def prix_format(self):
         if self.prix is None:
@@ -230,7 +211,6 @@ class Transaction(models.Model):
     vendeur = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ventes')
     prix_final = models.DecimalField(max_digits=10, decimal_places=2)
     date_transaction = models.DateTimeField(auto_now_add=True)
-    date_confirmation = models.DateTimeField(blank=True, null=True)
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='en_attente')
     date_mise_a_jour = models.DateTimeField(auto_now=True)
     notes = models.TextField(blank=True)
@@ -261,17 +241,55 @@ class Transaction(models.Model):
         }
         return statuts.get(self.statut, self.statut)
 
+
+class Reservation(models.Model):
+    STATUTS = [
+        ("en_attente", "En attente"),
+        ("acceptee", "Acceptée"),
+        ("refusee", "Refusée"),
+        ("annulee", "Annulée"),
+        ("terminee", "Terminée"),
+    ]
+
+    TYPE_CHOICES = [
+        ("reservation", "Réservation véhicule"),
+        ("essai", "Essai"),
+    ]
+
+    voiture = models.ForeignKey(Voiture, on_delete=models.CASCADE, related_name="reservations")
+    client = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reservations")
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default="reservation")
+    debut = models.DateTimeField()
+    fin = models.DateTimeField()
+    statut = models.CharField(max_length=20, choices=STATUTS, default="en_attente")
+    note = models.TextField(blank=True)
+    signature = models.TextField(blank=True)
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_creation"]
+        verbose_name = "Réservation"
+        verbose_name_plural = "Réservations"
+
+    def __str__(self):
+        return f"Reservation #{self.id} - {self.voiture}"
+
+    @property
+    def is_active(self):
+        return self.statut in {"en_attente", "acceptee"} and self.fin > timezone.now()
+
+    @staticmethod
+    def overlaps(voiture_id: int, start: datetime, end: datetime) -> bool:
+        return Reservation.objects.filter(
+            voiture_id=voiture_id,
+            statut__in=["en_attente", "acceptee"],
+            debut__lt=end,
+            fin__gt=start,
+        ).exists()
+
 class Message(models.Model):
-    conversation = models.ForeignKey(
-        "Conversation",
-        on_delete=models.CASCADE,
-        related_name="messages",
-        null=True,
-        blank=True,
-    )
     expediteur = models.ForeignKey(User, on_delete=models.CASCADE, related_name='messages_envoyes')
     destinataire = models.ForeignKey(User, on_delete=models.CASCADE, related_name='messages_recus')
-    voiture = models.ForeignKey(Voiture, on_delete=models.SET_NULL, null=True, blank=True)
     sujet = models.CharField(max_length=200)
     contenu = models.TextField()
     date_envoi = models.DateTimeField(auto_now_add=True)
@@ -290,42 +308,9 @@ class Message(models.Model):
         self.save()
 
 
-class Conversation(models.Model):
-    """
-    Conversation 1:1 entre deux utilisateurs, optionnellement liée à une annonce.
-    `is_support=True` pour les échanges avec l'admin/support.
-    """
-
-    participant_a = models.ForeignKey(User, on_delete=models.CASCADE, related_name="conversations_a")
-    participant_b = models.ForeignKey(User, on_delete=models.CASCADE, related_name="conversations_b")
-    voiture = models.ForeignKey(Voiture, on_delete=models.SET_NULL, null=True, blank=True, related_name="conversations")
-    is_support = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["participant_a", "participant_b", "voiture", "is_support"],
-                name="uniq_conversation_participants_voiture_support",
-            )
-        ]
-
-    def __str__(self):
-        return f"{self.participant_a.username} ↔ {self.participant_b.username}"
-
-    def other_for(self, user: User) -> User | None:
-        if user_id := getattr(user, "id", None):
-            if self.participant_a_id == user_id:
-                return self.participant_b
-            if self.participant_b_id == user_id:
-                return self.participant_a
-        return None
-
 class Notification(models.Model):
     TYPE_CHOICES = [
         ("new_listing", "Nouvelle annonce"),
-        ("listing_moderation", "Validation annonce"),
         ("purchase_request", "Demande d'achat"),
         ("sale_confirmed", "Vente confirmée"),
         ("message", "Message"),

@@ -4,138 +4,236 @@
 {% block main_class %}container py-4{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-lg-9">
-    <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
-      <div>
-        <h1 class="h3 mb-1">Publier une annonce</h1>
-        <p class="am-muted mb-0">Ajoutez les informations essentielles. Vous pourrez compléter les photos plus tard.</p>
-      </div>
-      <a class="btn btn-outline-secondary" href="{% url 'accueil' %}"><i class="fa-solid fa-arrow-left me-2"></i>Retour</a>
-    </div>
-
+<div class="row g-4">
+  <div class="col-lg-8">
     <div class="am-card am-form-card p-4 p-md-5">
-      <form method="post" enctype="multipart/form-data">
+      <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+        <div>
+          <h1 class="h4 mb-1">Publier une annonce</h1>
+          <p class="am-muted mb-0">Ajoutez les détails de votre voiture. La mise en ligne est immédiate.</p>
+        </div>
+        <span class="badge text-bg-light am-badge">Vendeur: {{ user.username }}</span>
+      </div>
+
+      <form id="ajoutVoitureForm" method="post" enctype="multipart/form-data" class="vstack gap-3">
         {% csrf_token %}
-
-        {% if not marques %}
-          <div class="alert alert-warning">
-            <div class="fw-semibold mb-1">Aucune marque disponible</div>
-            <div class="small">
-              Ajoutez des marques via l'admin (table <code>Marque</code>) ou exécutez
-              <code>python manage.py init_catalog</code>.
-            </div>
-          </div>
-        {% endif %}
-
         <div class="row g-3">
           <div class="col-md-6">
-            <label for="marque" class="form-label">Marque</label>
+            <label class="form-label" for="marque">Marque</label>
             <select class="form-select" id="marque" name="marque" required>
-              <option value="">Sélectionnez une marque</option>
+              <option value="">Choisir une marque</option>
               {% for marque in marques %}
                 <option value="{{ marque.id }}">{{ marque.nom }}</option>
               {% endfor %}
+              <option value="__new__">+ Nouvelle marque</option>
+            </select>
+            <div class="am-form-hint">Choisissez dans la liste ou créez une nouvelle marque.</div>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label" for="modele">Modèle</label>
+            <input class="form-control" id="modele" name="modele" required placeholder="Ex: Corolla, Golf, 208">
+          </div>
+
+          <div class="col-md-12 d-none" id="newMarqueFields">
+            <div class="row g-2">
+              <div class="col-md-4">
+                <label class="form-label" for="new_marque_nom">Nom de la nouvelle marque</label>
+                <input class="form-control" id="new_marque_nom" name="new_marque_nom" placeholder="Ex: Tata, Changan">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="new_marque_pays">Pays</label>
+                <input class="form-control" id="new_marque_pays" name="new_marque_pays" placeholder="Ex: Chine">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="new_marque_date">Date de création</label>
+                <input class="form-control" id="new_marque_date" name="new_marque_date" type="date">
+              </div>
+            </div>
+            <div class="am-form-hint mt-1">Si la marque n'existe pas, elle sera créée.</div>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label" for="prix">Prix (FCFA)</label>
+            <input class="form-control" id="prix" name="prix" type="number" min="0" step="50000" required data-price-display>
+            <div class="am-form-hint d-flex justify-content-between">
+              <span>Conseil : alignez-vous sur le marché.</span>
+              <span class="fw-semibold" id="priceDisplay">—</span>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="kilometrage">Kilométrage</label>
+            <input class="form-control" id="kilometrage" name="kilometrage" type="number" min="0" step="1000" required data-km-display>
+            <div class="am-form-hint d-flex justify-content-between">
+              <span>Indiquez le kilométrage réel.</span>
+              <span class="fw-semibold" id="kmDisplay">—</span>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="annee">Année</label>
+            <input class="form-control" id="annee" name="annee" type="number" min="1990" max="2026" required>
+            <div class="am-form-hint">Max 2026.</div>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label" for="couleur">Couleur</label>
+            <input class="form-control" id="couleur" name="couleur" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="etat">État</label>
+            <select class="form-select" id="etat" name="etat" required>
+              <option value="neuve">Neuve</option>
+              <option value="occasion">Occasion</option>
             </select>
           </div>
-
-          <div class="col-md-6">
-            <label for="modele" class="form-label">Modèle</label>
-            <input type="text" class="form-control" id="modele" name="modele" required placeholder="Ex: Clio, Golf, 208">
+          <div class="col-md-4">
+            <label class="form-label" for="image">Image principale</label>
+            <input class="form-control" id="image" name="image" type="file" accept="image/*">
+            <div class="am-form-hint">JPEG/PNG/WebP, max 5 Mo.</div>
           </div>
 
-          <div class="col-md-4">
-            <label for="prix" class="form-label">Prix (FCFA)</label>
-            <input type="number" class="form-control" id="prix" name="prix" min="0" step="0.01" required>
-          </div>
-          <div class="col-md-4">
-            <label for="kilometrage" class="form-label">Kilométrage</label>
-            <input type="number" class="form-control" id="kilometrage" name="kilometrage" min="0" required>
-          </div>
-          <div class="col-md-4">
-            <label for="annee" class="form-label">Année</label>
-            <input type="number" class="form-control" id="annee" name="annee" min="1900" max="2026" required>
+          <div class="col-md-8">
+            <label class="form-label" for="images">Autres photos (optionnel, multiple)</label>
+            <input class="form-control" id="images" name="images" type="file" accept="image/*" multiple>
+            <div class="am-form-hint">Ajoutez plusieurs photos pour améliorer l'annonce.</div>
           </div>
 
           <div class="col-md-6">
-            <label for="type_carburant" class="form-label">Carburant</label>
+            <label class="form-label" for="type_carburant">Carburant</label>
             <select class="form-select" id="type_carburant" name="type_carburant" required>
               <option value="essence">Essence</option>
               <option value="diesel">Diesel</option>
-              <option value="hybride">Hybride</option>
               <option value="electrique">Électrique</option>
-              <option value="gpl">GPL</option>
+              <option value="hybride">Hybride</option>
             </select>
           </div>
-
           <div class="col-md-6">
-            <label for="transmission" class="form-label">Transmission</label>
+            <label class="form-label" for="transmission">Transmission</label>
             <select class="form-select" id="transmission" name="transmission" required>
               <option value="manuelle">Manuelle</option>
               <option value="automatique">Automatique</option>
-              <option value="semi-auto">Semi-automatique</option>
             </select>
           </div>
 
           <div class="col-md-6">
-            <label for="puissance" class="form-label">Puissance (ch)</label>
-            <input type="number" class="form-control" id="puissance" name="puissance" min="1" value="100">
+            <label class="form-label" for="puissance">Puissance (ch)</label>
+            <input class="form-control" id="puissance" name="puissance" type="number" min="30" max="1000" step="5" value="100">
           </div>
           <div class="col-md-6">
-            <label for="consommation" class="form-label">Consommation (L/100)</label>
-            <input type="number" class="form-control" id="consommation" name="consommation" min="0" step="0.1" value="6.0">
-          </div>
-
-          <div class="col-md-6">
-            <label for="couleur" class="form-label">Couleur</label>
-            <select class="form-select" id="couleur" name="couleur" required>
-              <option value="">Sélectionnez une couleur</option>
-              <option value="blanc">Blanc</option>
-              <option value="noir">Noir</option>
-              <option value="gris">Gris</option>
-              <option value="rouge">Rouge</option>
-              <option value="bleu">Bleu</option>
-              <option value="vert">Vert</option>
-              <option value="jaune">Jaune</option>
-              <option value="argent">Argent</option>
-              <option value="orange">Orange</option>
-              <option value="violet">Violet</option>
-              <option value="marron">Marron</option>
-              <option value="beige">Beige</option>
-            </select>
-          </div>
-
-          <div class="col-md-6">
-            <label for="etat" class="form-label">État</label>
-            <select class="form-select" id="etat" name="etat" required>
-              <option value="">Sélectionnez un état</option>
-              <option value="neuf">Neuf</option>
-              <option value="occasion">Occasion</option>
-              <option value="reconditionne">Reconditionné</option>
-            </select>
+            <label class="form-label" for="consommation">Consommation (L/100km)</label>
+            <input class="form-control" id="consommation" name="consommation" type="number" min="1" max="30" step="0.1" value="6.0">
           </div>
 
           <div class="col-12">
-            <label for="description" class="form-label">Description</label>
-            <textarea class="form-control" id="description" name="description" rows="6" required
-                      placeholder="Décrivez l'état, les options, l'historique, etc."></textarea>
-          </div>
-
-          <div class="col-12">
-            <label for="image" class="form-label">Photo principale</label>
-            <input type="file" class="form-control" id="image" name="image" accept="image/*">
-            <div class="form-text">Vous pourrez ajouter de meilleures photos ensuite.</div>
+            <label class="form-label" for="description">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="4" required
+                      placeholder="État, historique, options, entretien..." maxlength="800" data-count-target></textarea>
+            <div class="am-form-hint d-flex justify-content-between">
+              <span>Soyez précis : entretien, options, réparations récentes.</span>
+              <span id="descCounter"></span>
+            </div>
           </div>
         </div>
 
-        <div class="d-flex flex-wrap justify-content-between gap-2 mt-4">
-          <button type="submit" class="btn btn-primary btn-lg">
+        <div class="d-flex flex-wrap gap-3 align-items-center mt-2">
+          <button class="btn btn-primary" type="submit" data-loading>
             <i class="fa-solid fa-paper-plane me-2"></i> Publier l'annonce
           </button>
-          <a href="{% url 'accueil' %}" class="btn btn-outline-secondary btn-lg">Annuler</a>
+          <a class="btn btn-outline-secondary" href="{% url 'mes_voitures' %}">Annuler</a>
+          <div class="d-flex align-items-center gap-2">
+            <div class="ratio ratio-16x9" style="width: 140px;" id="previewFrame">
+              <img id="previewImage" class="am-img-contain rounded border" alt="Prévisualisation" style="display:none;">
+              <div id="previewSkeleton" class="am-img-skeleton rounded"></div>
+            </div>
+            <div class="small am-muted">Prévisualisation de l'image principale.</div>
+          </div>
         </div>
       </form>
     </div>
   </div>
+
+  <aside class="col-lg-4">
+    <div class="am-card p-4 mb-3">
+      <h2 class="h6 mb-2">Conseils</h2>
+      <ul class="small am-muted mb-0 vstack gap-2">
+        <li>Photos nettes (6 à 10) augmentent vos chances.</li>
+        <li>Indiquez entretien, factures, options clés.</li>
+        <li>Un prix cohérent accélère les contacts.</li>
+      </ul>
+    </div>
+    <div class="am-card p-4">
+      <h2 class="h6 mb-2">Astuces rapides</h2>
+      <div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary am-pill-btn"
+                data-quick-filter="prix_min=1000000,prix_max=5000000" data-form="#ajoutVoitureForm">
+          Prix 1–5 M
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary am-pill-btn"
+                data-quick-filter="annee=2022" data-form="#ajoutVoitureForm">
+          Année 2022
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary am-pill-btn"
+                data-quick-filter="kilometrage=50000" data-form="#ajoutVoitureForm">
+          50 000 km
+        </button>
+      </div>
+    </div>
+  </aside>
 </div>
+
+<script>
+  // Prévisualisation image + validation simple (taille/format)
+  (function() {
+    const input = document.getElementById("image");
+    const img = document.getElementById("previewImage");
+    const skeleton = document.getElementById("previewSkeleton");
+    if (!input || !img || !skeleton) return;
+
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    const maxBytes = 5 * 1024 * 1024;
+
+    input.addEventListener("change", () => {
+      const file = input.files && input.files[0];
+      if (!file) {
+        img.style.display = "none";
+        skeleton.style.display = "block";
+        return;
+      }
+      if (file.size > maxBytes) {
+        alert("Image trop volumineuse (max 5 Mo)");
+        input.value = "";
+        img.style.display = "none";
+        skeleton.style.display = "block";
+        return;
+      }
+      if (!allowed.includes(file.type)) {
+        alert("Format non supporté (JPEG, PNG, WebP)");
+        input.value = "";
+        img.style.display = "none";
+        skeleton.style.display = "block";
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.src = e.target.result;
+        img.style.display = "block";
+        skeleton.style.display = "none";
+      };
+      reader.readAsDataURL(file);
+    });
+  })();
+
+  // Toggle nouveaux champs de marque
+  (function() {
+    const select = document.getElementById("marque");
+    const panel = document.getElementById("newMarqueFields");
+    if (!select || !panel) return;
+    const toggle = () => {
+      const isNew = select.value === "__new__";
+      panel.classList.toggle("d-none", !isNew);
+    };
+    select.addEventListener("change", toggle);
+    toggle();
+  })();
+</script>
 {% endblock %}

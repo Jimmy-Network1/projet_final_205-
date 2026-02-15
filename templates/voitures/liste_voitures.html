@@ -9,23 +9,26 @@
 <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
   <div>
     <h1 class="h3 mb-1">Explorer les voitures</h1>
-    <div class="am-muted">
+    <div class="am-muted d-flex flex-wrap gap-2 align-items-center">
       {% if prix_moyen %}
-        Prix moyen: <span class="fw-semibold">{{ prix_moyen|fcfa }}</span>
+        <span class="badge text-bg-light am-badge">Prix moyen {{ prix_moyen|fcfa }}</span>
       {% endif %}
       {% if voitures.paginator.count %}
-        <span class="mx-2">•</span>{{ voitures.paginator.count }} résultat{{ voitures.paginator.count|pluralize }}
+        <span class="badge text-bg-light am-badge">{{ voitures.paginator.count }} résultat{{ voitures.paginator.count|pluralize }}</span>
       {% endif %}
     </div>
-    <div class="mt-2 d-flex flex-wrap gap-2">
-      <div class="btn-group btn-group-sm" role="group" aria-label="Type de véhicule">
-        <button class="btn btn-outline-secondary {% if not etat_selected %}active{% endif %}" type="button" data-etat-preset="">Tous</button>
-        <button class="btn btn-outline-secondary {% if etat_selected|length == 1 and 'neuf' in etat_selected %}active{% endif %}" type="button" data-etat-preset="neuf">Neuf</button>
-        <button class="btn btn-outline-secondary {% if etat_selected|length == 1 and 'occasion' in etat_selected %}active{% endif %}" type="button" data-etat-preset="occasion">Occasion</button>
-        <button class="btn btn-outline-secondary {% if etat_selected|length == 1 and 'reconditionne' in etat_selected %}active{% endif %}" type="button" data-etat-preset="reconditionne">Reconditionné</button>
+    {% if q or marque_selected or prix_min or prix_max or annee_min or annee_max or statut %}
+      <div class="d-flex flex-wrap gap-2 mt-2">
+        {% if q %}<button type="button" class="am-chip" data-remove-filter="q">{{ q }} <i class="fa-solid fa-xmark"></i></button>{% endif %}
+        {% if marque_selected %}<button type="button" class="am-chip" data-remove-filter="marque">Marque {{ marque_selected }} <i class="fa-solid fa-xmark"></i></button>{% endif %}
+        {% if prix_min %}<button type="button" class="am-chip" data-remove-filter="prix_min">Min {{ prix_min }} <i class="fa-solid fa-xmark"></i></button>{% endif %}
+        {% if prix_max %}<button type="button" class="am-chip" data-remove-filter="prix_max">Max {{ prix_max }} <i class="fa-solid fa-xmark"></i></button>{% endif %}
+        {% if annee_min %}<button type="button" class="am-chip" data-remove-filter="annee_min">≥ {{ annee_min }} <i class="fa-solid fa-xmark"></i></button>{% endif %}
+        {% if annee_max %}<button type="button" class="am-chip" data-remove-filter="annee_max">≤ {{ annee_max }} <i class="fa-solid fa-xmark"></i></button>{% endif %}
+        {% if statut %}<button type="button" class="am-chip" data-remove-filter="statut">{{ statut|capfirst }} <i class="fa-solid fa-xmark"></i></button>{% endif %}
+        <a class="am-chip text-decoration-none" href="{% url 'liste_voitures' %}">Réinitialiser</a>
       </div>
-      <div class="small am-muted align-self-center">Astuce: combinez plusieurs critères dans les filtres.</div>
-    </div>
+    {% endif %}
   </div>
 
   <div class="d-flex gap-2">
@@ -43,9 +46,9 @@
 
 <div class="row g-4">
   <aside class="col-lg-3">
-    <div class="am-card p-3 p-lg-4 d-none d-lg-block">
+    <div class="am-card p-3 p-lg-4 d-none d-lg-block sticky-top" style="top: 92px;">
       <h2 class="h6 mb-3">Filtres</h2>
-      <form method="get" action="{% url 'liste_voitures' %}" class="vstack gap-3" data-ajax-filters>
+      <form id="filtersFormDesktop" method="get" action="{% url 'liste_voitures' %}" class="vstack gap-3">
         <div>
           <label class="form-label" for="q">Recherche</label>
           <input class="form-control" id="q" name="q" value="{{ q|default:'' }}" placeholder="Marque, modèle, description">
@@ -82,27 +85,6 @@
           </select>
         </div>
 
-        <div>
-          <div class="form-label mb-2">Type</div>
-          <div class="vstack gap-2">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="etat" id="etat_neuf" value="neuf"
-                     {% if 'neuf' in etat_selected %}checked{% endif %}>
-              <label class="form-check-label" for="etat_neuf">Neuf</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="etat" id="etat_occasion" value="occasion"
-                     {% if 'occasion' in etat_selected %}checked{% endif %}>
-              <label class="form-check-label" for="etat_occasion">Occasion</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="etat" id="etat_reconditionne" value="reconditionne"
-                     {% if 'reconditionne' in etat_selected %}checked{% endif %}>
-              <label class="form-check-label" for="etat_reconditionne">Reconditionné</label>
-            </div>
-          </div>
-        </div>
-
         <div class="row g-2">
           <div class="col-6">
             <label class="form-label" for="prix_min">Prix min</label>
@@ -134,17 +116,28 @@
   </aside>
 
   <section class="col-lg-9">
-    <div id="results">
     {% if voitures %}
       <div class="row g-3">
         {% for voiture in voitures %}
           <div class="col-md-6 col-xl-4">
             <div class="am-card am-card-hover h-100 overflow-hidden">
               <div class="ratio ratio-16x9 bg-light position-relative">
-                {% if voiture.est_reservee %}
+                {% if voiture.est_vendue %}
+                  <span class="badge text-bg-danger position-absolute top-0 start-0 m-3">Vendue</span>
+                {% elif voiture.est_reservee %}
                   <span class="badge text-bg-warning position-absolute top-0 start-0 m-3">Réservée</span>
+                {% else %}
+                  <span class="badge text-bg-success position-absolute top-0 start-0 m-3">Disponible</span>
                 {% endif %}
-                <img class="am-img-cover" src="{{ voiture.image_principale.url }}"
+                {% if user.is_authenticated and user != voiture.vendeur %}
+                  <form class="position-absolute top-0 end-0 m-2" method="post" action="{% url 'toggle_favori' voiture.id %}">
+                    {% csrf_token %}
+                    <button class="btn btn-light btn-sm rounded-circle shadow-sm" type="submit" aria-label="Favori">
+                      <i class="fa-regular fa-heart"></i>
+                    </button>
+                  </form>
+                {% endif %}
+                <img class="am-img-cover am-img-skeleton" src="{{ voiture.image_principale.url }}"
                      onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
                      alt="{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}" loading="lazy">
               </div>
@@ -169,7 +162,7 @@
                   {% if user.is_authenticated and user != voiture.vendeur %}
                     <form method="post" action="{% url 'toggle_favori' voiture.id %}">
                       {% csrf_token %}
-                      <button class="btn btn-outline-danger w-100" type="submit">
+                      <button class="btn btn-outline-danger w-100" type="submit" aria-label="Ajouter aux favoris">
                         <i class="fa-regular fa-heart me-2"></i> Favori
                       </button>
                     </form>
@@ -186,7 +179,7 @@
           <ul class="pagination justify-content-center">
             {% if voitures.has_previous %}
               <li class="page-item">
-                <a class="page-link" href="?page={{ voitures.previous_page_number }}&q={{ q|default:'' }}&sort={{ sort|default:'' }}&statut={{ statut|default:'' }}&marque={{ marque_selected|default:'' }}{% for e in etat_selected %}&etat={{ e }}{% endfor %}&prix_min={{ prix_min|default:'' }}&prix_max={{ prix_max|default:'' }}&annee_min={{ annee_min|default:'' }}&annee_max={{ annee_max|default:'' }}">Précédent</a>
+                <a class="page-link" href="?page={{ voitures.previous_page_number }}&q={{ q|default:'' }}&sort={{ sort|default:'' }}&statut={{ statut|default:'' }}&marque={{ marque_selected|default:'' }}&prix_min={{ prix_min|default:'' }}&prix_max={{ prix_max|default:'' }}&annee_min={{ annee_min|default:'' }}&annee_max={{ annee_max|default:'' }}">Précédent</a>
               </li>
             {% else %}
               <li class="page-item disabled"><span class="page-link">Précédent</span></li>
@@ -197,14 +190,14 @@
                 <li class="page-item active"><span class="page-link">{{ n }}</span></li>
               {% elif n >= voitures.number|add:-2 and n <= voitures.number|add:2 %}
                 <li class="page-item">
-                  <a class="page-link" href="?page={{ n }}&q={{ q|default:'' }}&sort={{ sort|default:'' }}&statut={{ statut|default:'' }}&marque={{ marque_selected|default:'' }}{% for e in etat_selected %}&etat={{ e }}{% endfor %}&prix_min={{ prix_min|default:'' }}&prix_max={{ prix_max|default:'' }}&annee_min={{ annee_min|default:'' }}&annee_max={{ annee_max|default:'' }}">{{ n }}</a>
+                  <a class="page-link" href="?page={{ n }}&q={{ q|default:'' }}&sort={{ sort|default:'' }}&statut={{ statut|default:'' }}&marque={{ marque_selected|default:'' }}&prix_min={{ prix_min|default:'' }}&prix_max={{ prix_max|default:'' }}&annee_min={{ annee_min|default:'' }}&annee_max={{ annee_max|default:'' }}">{{ n }}</a>
                 </li>
               {% endif %}
             {% endfor %}
 
             {% if voitures.has_next %}
               <li class="page-item">
-                <a class="page-link" href="?page={{ voitures.next_page_number }}&q={{ q|default:'' }}&sort={{ sort|default:'' }}&statut={{ statut|default:'' }}&marque={{ marque_selected|default:'' }}{% for e in etat_selected %}&etat={{ e }}{% endfor %}&prix_min={{ prix_min|default:'' }}&prix_max={{ prix_max|default:'' }}&annee_min={{ annee_min|default:'' }}&annee_max={{ annee_max|default:'' }}">Suivant</a>
+                <a class="page-link" href="?page={{ voitures.next_page_number }}&q={{ q|default:'' }}&sort={{ sort|default:'' }}&statut={{ statut|default:'' }}&marque={{ marque_selected|default:'' }}&prix_min={{ prix_min|default:'' }}&prix_max={{ prix_max|default:'' }}&annee_min={{ annee_min|default:'' }}&annee_max={{ annee_max|default:'' }}">Suivant</a>
               </li>
             {% else %}
               <li class="page-item disabled"><span class="page-link">Suivant</span></li>
@@ -215,7 +208,6 @@
     {% else %}
       <div class="alert alert-info">Aucune voiture ne correspond à vos critères.</div>
     {% endif %}
-    </div>
   </section>
 </div>
 
@@ -225,7 +217,7 @@
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fermer"></button>
   </div>
   <div class="offcanvas-body">
-    <form method="get" action="{% url 'liste_voitures' %}" class="vstack gap-3" data-ajax-filters>
+    <form id="filtersFormMobile" method="get" action="{% url 'liste_voitures' %}" class="vstack gap-3">
       <div>
         <label class="form-label" for="q_mobile">Recherche</label>
         <input class="form-control" id="q_mobile" name="q" value="{{ q|default:'' }}" placeholder="Marque, modèle, description">
@@ -259,27 +251,6 @@
           <option value="reservee" {% if statut == 'reservee' %}selected{% endif %}>Réservée</option>
         </select>
       </div>
-
-      <div>
-        <div class="form-label mb-2">Type</div>
-        <div class="vstack gap-2">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="etat" id="etat_neuf_mobile" value="neuf"
-                   {% if 'neuf' in etat_selected %}checked{% endif %}>
-            <label class="form-check-label" for="etat_neuf_mobile">Neuf</label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="etat" id="etat_occasion_mobile" value="occasion"
-                   {% if 'occasion' in etat_selected %}checked{% endif %}>
-            <label class="form-check-label" for="etat_occasion_mobile">Occasion</label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="etat" id="etat_reconditionne_mobile" value="reconditionne"
-                   {% if 'reconditionne' in etat_selected %}checked{% endif %}>
-            <label class="form-check-label" for="etat_reconditionne_mobile">Reconditionné</label>
-          </div>
-        </div>
-      </div>
       <div class="row g-2">
         <div class="col-6">
           <label class="form-label" for="prix_min_mobile">Prix min</label>
@@ -304,87 +275,29 @@
         <button class="btn btn-primary" type="submit"><i class="fa-solid fa-filter me-2"></i>Appliquer</button>
         <a class="btn btn-outline-secondary" href="{% url 'liste_voitures' %}">Réinitialiser</a>
       </div>
+
+      <div class="mt-3">
+        <div class="small am-muted mb-2">Raccourcis</div>
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-sm btn-outline-secondary" type="button"
+                  data-quick-filter="prix_max=5000000" data-form="#filtersFormMobile">
+            &lt; 5 M FCFA
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" type="button"
+                  data-quick-filter="prix_min=5000000,prix_max=15000000" data-form="#filtersFormMobile">
+            5–15 M
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" type="button"
+                  data-quick-filter="annee_min=2018" data-form="#filtersFormMobile">
+            ≥ 2018
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" type="button"
+                  data-quick-filter="statut=disponible" data-form="#filtersFormMobile">
+            Disponibles
+          </button>
+        </div>
+      </div>
     </form>
   </div>
 </div>
-
-{% block extra_js %}
-<script>
-  (function () {
-    const resultsSelector = "#results";
-    let resultsRoot = document.querySelector(resultsSelector);
-    if (!resultsRoot) return;
-    const forms = Array.from(document.querySelectorAll("form[data-ajax-filters]"));
-    if (!forms.length) return;
-
-    function buildUrlFromForm(form, extraParams) {
-      const url = new URL(form.action, window.location.origin);
-      const params = new URLSearchParams(new FormData(form));
-      if (extraParams) {
-        for (const [k, v] of extraParams) params.set(k, v);
-      }
-      url.search = params.toString();
-      return url.toString();
-    }
-
-    let pending = null;
-    function fetchAndSwap(url, pushState) {
-      if (pending) pending.abort();
-      pending = new AbortController();
-      fetch(url, { signal: pending.signal, headers: { "X-Requested-With": "fetch" } })
-        .then(r => r.text())
-        .then(html => {
-          const doc = new DOMParser().parseFromString(html, "text/html");
-          const next = doc.querySelector(resultsSelector);
-          if (!next) return;
-          resultsRoot.replaceWith(next);
-          resultsRoot = next;
-          if (pushState) window.history.pushState({}, "", url);
-        })
-        .catch(() => {});
-    }
-
-    let timer = null;
-    function scheduleSubmit(form) {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        const url = buildUrlFromForm(form);
-        fetchAndSwap(url, true);
-      }, 250);
-    }
-
-    for (const form of forms) {
-      form.addEventListener("change", () => scheduleSubmit(form));
-      form.addEventListener("submit", (e) => {
-        e.preventDefault();
-        const url = buildUrlFromForm(form);
-        fetchAndSwap(url, true);
-      });
-    }
-
-    document.addEventListener("click", (e) => {
-      const btn = e.target.closest("[data-etat-preset]");
-      if (!btn) return;
-      const preset = (btn.getAttribute("data-etat-preset") || "").trim();
-      for (const form of forms) {
-        const boxes = Array.from(form.querySelectorAll("input[type=checkbox][name=etat]"));
-        for (const box of boxes) box.checked = preset ? box.value === preset : false;
-      }
-      scheduleSubmit(forms[0]);
-    });
-
-    document.addEventListener("click", (e) => {
-      const link = e.target.closest(resultsSelector + " a.page-link");
-      if (!link) return;
-      const href = link.getAttribute("href");
-      if (!href || href.startsWith("#")) return;
-      e.preventDefault();
-      const url = new URL(href, window.location.href).toString();
-      fetchAndSwap(url, true);
-    });
-
-    window.addEventListener("popstate", () => fetchAndSwap(window.location.href, false));
-  })();
-</script>
-{% endblock %}
 {% endblock %}

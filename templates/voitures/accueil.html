@@ -12,16 +12,16 @@
     <div class="row align-items-center g-5">
       <div class="col-lg-7">
         <div class="hero-badges d-flex flex-wrap gap-2 mb-3 reveal-up">
-          <span class="badge rounded-pill px-3 py-2"><i class="fa-solid fa-shield-halved me-2"></i>Offres vérifiées</span>
-          <span class="badge rounded-pill px-3 py-2"><i class="fa-solid fa-magnifying-glass me-2"></i>Recherche rapide</span>
-          <span class="badge rounded-pill px-3 py-2"><i class="fa-regular fa-heart me-2"></i>Favoris</span>
+          <span class="badge rounded-pill px-3 py-2 bg-white text-dark"><i class="fa-solid fa-shield-halved me-2 text-success"></i>Transactions sécurisées</span>
+          <span class="badge rounded-pill px-3 py-2 bg-white text-dark"><i class="fa-solid fa-magnifying-glass me-2 text-primary"></i>Recherche rapide</span>
+          <span class="badge rounded-pill px-3 py-2 bg-white text-dark"><i class="fa-regular fa-heart me-2 text-danger"></i>Favoris</span>
         </div>
 
         <h1 class="display-4 fw-semibold text-white hero-title mb-3 reveal-up delay-1">
-          Trouvez votre prochaine voiture
+          Votre prochaine voiture, en quelques clics.
         </h1>
         <p class="lead hero-subtitle mb-4 reveal-up delay-2">
-          Une expérience simple et premium: annonces claires, filtres rapides, favoris, et achat en ligne.
+          Une expérience simple et premium : annonces claires, filtres rapides, favoris et suivi d’achat.
         </p>
 
         <div class="hero-actions d-flex flex-wrap gap-2 reveal-up delay-3">
@@ -39,18 +39,18 @@
           {% endif %}
         </div>
 
-        <div class="hero-kpis p-3 p-md-4 mt-4 reveal-up delay-4">
+        <div class="hero-kpis p-3 p-md-4 mt-4 reveal-up delay-4 am-card bg-white bg-opacity-75 border-0">
           <div class="row g-3">
-            <div class="col-4">
-              <div class="label small mb-1">Disponibles</div>
-              <div class="h4 mb-0 value">{{ total_voitures }}</div>
+            <div class="col-4 text-center">
+              <div class="small am-muted"><i class="fa-solid fa-car-side me-2"></i>Disponibles</div>
+              <div class="h4 mb-0 value">{{ total_voitures|default:0|floatformat:0 }}</div>
             </div>
-            <div class="col-4">
-              <div class="label small mb-1">Marques</div>
+            <div class="col-4 text-center">
+              <div class="small am-muted"><i class="fa-solid fa-award me-2"></i>Marques</div>
               <div class="h4 mb-0 value">{{ marques_populaires|length }}</div>
             </div>
-            <div class="col-4">
-              <div class="label small mb-1">Nouveautés</div>
+            <div class="col-4 text-center">
+              <div class="small am-muted"><i class="fa-regular fa-clock me-2"></i>Nouveautés</div>
               <div class="h4 mb-0 value">{{ voitures_recentes|length }}</div>
             </div>
           </div>
@@ -174,29 +174,26 @@
 
   <div class="d-flex align-items-end justify-content-between gap-3 mb-3">
     <div>
-      <h2 class="h4 mb-1 home-section-title">Marques</h2>
-      <p class="am-muted mb-0">Les marques disponibles sur la plateforme (mise à jour automatiquement).</p>
+      <h2 class="h4 mb-1 home-section-title">Marques populaires</h2>
+      <p class="am-muted mb-0">Les marques les plus présentes sur la plateforme.</p>
     </div>
-    <a class="btn btn-sm btn-outline-secondary" href="{% url 'liste_marques' %}">Voir tout</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'liste_voitures' %}">Voir tout</a>
   </div>
 
   <div class="row g-3">
-    {% for marque in marques_home %}
+    {% for marque in marques_populaires %}
       <div class="col-6 col-md-3 col-lg-2">
-        <a class="am-card am-card-hover p-3 h-100 text-center text-decoration-none" href="{% url 'liste_voitures' %}?marque={{ marque.id }}">
-          <div class="d-flex justify-content-center">
-            <div class="brand-tile">
-              <img
-                class="brand-logo"
-                src="{% url 'marque_logo' marque.id %}"
-                alt="{{ marque.nom }}"
-                loading="lazy"
-                onerror="this.onerror=null;this.src='{% url 'marque_logo_svg' marque.id %}';"
-              >
-            </div>
+        <div class="am-card am-card-hover p-3 h-100 text-center">
+          <div class="mb-2">
+            {% if marque.logo %}
+              <img src="{{ marque.logo.url }}" alt="{{ marque.nom }}" style="height:40px; width:auto" loading="lazy">
+            {% else %}
+              <span class="badge text-bg-light am-badge">{{ marque.nom|slice:":1" }}</span>
+            {% endif %}
           </div>
-          <div class="fw-semibold mt-2 brand-name">{{ marque.nom }}</div>
-        </a>
+          <div class="fw-semibold">{{ marque.nom }}</div>
+          <div class="small am-muted">{{ marque.pays }}</div>
+        </div>
       </div>
     {% empty %}
       <div class="col-12">

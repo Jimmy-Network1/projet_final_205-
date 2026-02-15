@@ -1,68 +1,73 @@
 {% extends 'base.html' %}
-{% load static %}
 
-{% block title %}Messages - AutoMarket{% endblock %}
+{% block title %}Mes messages - AutoMarket{% endblock %}
 {% block main_class %}container py-4{% endblock %}
 
 {% block content %}
 <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
   <div>
-    <h1 class="h3 mb-1">Messages</h1>
-    <p class="am-muted mb-0">Vos conversations avec les vendeurs et le support.</p>
+    <h1 class="h3 mb-1">Mes messages</h1>
+    <p class="am-muted mb-0">Messages reçus et envoyés.</p>
   </div>
 </div>
+
+<ul class="nav nav-pills mb-3">
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'recus' %}active{% endif %}" href="?tab=recus">Reçus</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'envoyes' %}active{% endif %}" href="?tab=envoyes">Envoyés</a>
+  </li>
+</ul>
 
 <div class="am-card overflow-hidden">
   <div class="p-3 p-md-4 border-bottom">
-    <div class="fw-semibold">Conversations</div>
+    <div class="fw-semibold">{% if tab == 'recus' %}Boîte de réception{% else %}Messages envoyés{% endif %}</div>
   </div>
 
-  {% if cards %}
-    <div class="list-group list-group-flush">
-      {% for item in cards %}
-        {% with c=item.conversation other=item.other m=item.last_message %}
-          <a class="list-group-item list-group-item-action d-flex align-items-center justify-content-between gap-3"
-             href="{% url 'conversation_detail' c.id %}">
-            <div class="d-flex align-items-center gap-3">
-              <div class="am-car-media bg-light d-flex align-items-center justify-content-center" style="width:56px; height:56px; border-radius: 14px;">
-                <i class="fa-regular fa-comments"></i>
-              </div>
+  {% if tab == 'recus' %}
+    {% if recus %}
+      <div class="list-group list-group-flush">
+        {% for m in recus %}
+          <div class="list-group-item">
+            <div class="d-flex justify-content-between gap-2">
               <div>
-                <div class="fw-semibold">
-                  {{ other.username }}
-                  {% if c.is_support %}<span class="badge text-bg-light am-badge ms-2">Support</span>{% endif %}
-                </div>
-                <div class="small am-muted">
-                  {% if c.voiture_id %}
-                    Annonce #{{ c.voiture.id }} — {{ c.voiture.modele.marque.nom }} {{ c.voiture.modele.nom }}
-                  {% else %}
-                    Conversation
-                  {% endif %}
-                </div>
-                {% if m %}
-                  <div class="small am-muted mt-1">
-                    {{ m.expediteur.username }}: {{ m.contenu|truncatechars:70 }}
-                  </div>
-                {% endif %}
+                <div class="fw-semibold">{{ m.sujet }}</div>
+                <div class="small am-muted">De: {{ m.expediteur.username }}</div>
               </div>
+              <div class="text-nowrap small am-muted">{{ m.date_envoi|date:"d/m/Y H:i" }}</div>
             </div>
-
-            <div class="text-end">
-              <div class="small am-muted">
-                {% if m %}{{ m.date_envoi|date:"d/m/Y H:i" }}{% endif %}
-              </div>
-              {% if c.unread_count %}
-                <span class="badge text-bg-danger">{{ c.unread_count }}</span>
-              {% endif %}
-            </div>
-          </a>
-        {% endwith %}
-      {% endfor %}
-    </div>
+            <div class="mt-2">{{ m.contenu }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="p-4">
+        <div class="alert alert-info mb-0">Aucun message.</div>
+      </div>
+    {% endif %}
   {% else %}
-    <div class="p-4">
-      <div class="alert alert-info mb-0">Aucune conversation pour le moment.</div>
-    </div>
+    {% if envoyes %}
+      <div class="list-group list-group-flush">
+        {% for m in envoyes %}
+          <div class="list-group-item">
+            <div class="d-flex justify-content-between gap-2">
+              <div>
+                <div class="fw-semibold">{{ m.sujet }}</div>
+                <div class="small am-muted">À: {{ m.destinataire.username }}</div>
+              </div>
+              <div class="text-nowrap small am-muted">{{ m.date_envoi|date:"d/m/Y H:i" }}</div>
+            </div>
+            <div class="mt-2">{{ m.contenu }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="p-4">
+        <div class="alert alert-info mb-0">Aucun message envoyé.</div>
+      </div>
+    {% endif %}
   {% endif %}
 </div>
 {% endblock %}
+

@@ -18,22 +18,17 @@
   <div class="col-lg-8">
     <div class="am-card overflow-hidden mb-4">
       <div class="ratio ratio-16x9 bg-light position-relative">
-        {% if voiture.moderation_status != 'approved' %}
-          {% if voiture.moderation_status == 'rejected' %}
-            <span class="badge text-bg-danger position-absolute top-0 start-0 m-3">Refusée</span>
-          {% else %}
-            <span class="badge text-bg-info position-absolute top-0 start-0 m-3">En validation</span>
-          {% endif %}
-        {% elif voiture.est_vendue %}
+        {% if voiture.est_vendue %}
           <span class="badge text-bg-danger position-absolute top-0 start-0 m-3">Vendue</span>
         {% elif voiture.est_reservee %}
           <span class="badge text-bg-warning position-absolute top-0 start-0 m-3">Réservée</span>
         {% else %}
           <span class="badge text-bg-success position-absolute top-0 start-0 m-3">Disponible</span>
         {% endif %}
-        <img class="am-img-cover" src="{{ voiture.image_principale.url }}"
+        <img class="am-img-cover am-img-skeleton js-lightbox" src="{{ voiture.image_principale.url }}"
              onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
-             alt="{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}">
+             alt="{{ voiture.modele.marque.nom }} {{ voiture.modele.nom }}"
+             data-image="{{ voiture.image_principale.url }}">
       </div>
       <div class="p-4">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
@@ -51,39 +46,57 @@
 
         <div class="row g-3">
           <div class="col-md-4">
-            <div class="am-kpi p-3 h-100">
-              <div class="small am-muted">État</div>
-              <div class="fw-semibold">{{ voiture.get_etat_display }}</div>
+            <div class="am-kpi p-3 h-100 d-flex align-items-center gap-3">
+              <div class="brand-mark"><i class="fa-solid fa-sparkles"></i></div>
+              <div>
+                <div class="small am-muted">État</div>
+                <div class="fw-semibold">{{ voiture.get_etat_display }}</div>
+              </div>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="am-kpi p-3 h-100">
-              <div class="small am-muted">Carburant</div>
-              <div class="fw-semibold">{{ voiture.modele.get_type_carburant_display }}</div>
+            <div class="am-kpi p-3 h-100 d-flex align-items-center gap-3">
+              <div class="brand-mark"><i class="fa-solid fa-gas-pump"></i></div>
+              <div>
+                <div class="small am-muted">Carburant</div>
+                <div class="fw-semibold">{{ voiture.modele.get_type_carburant_display }}</div>
+              </div>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="am-kpi p-3 h-100">
-              <div class="small am-muted">Transmission</div>
-              <div class="fw-semibold">{{ voiture.modele.get_transmission_display }}</div>
+            <div class="am-kpi p-3 h-100 d-flex align-items-center gap-3">
+              <div class="brand-mark"><i class="fa-solid fa-gear"></i></div>
+              <div>
+                <div class="small am-muted">Transmission</div>
+                <div class="fw-semibold">{{ voiture.modele.get_transmission_display }}</div>
+              </div>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="am-kpi p-3 h-100">
-              <div class="small am-muted">Puissance</div>
-              <div class="fw-semibold">{{ voiture.modele.puissance }} ch</div>
+            <div class="am-kpi p-3 h-100 d-flex align-items-center gap-3">
+              <div class="brand-mark"><i class="fa-solid fa-bolt"></i></div>
+              <div>
+                <div class="small am-muted">Puissance</div>
+                <div class="fw-semibold">{{ voiture.modele.puissance }} ch</div>
+              </div>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="am-kpi p-3 h-100">
-              <div class="small am-muted">Conso</div>
-              <div class="fw-semibold">{{ voiture.modele.consommation }} L/100</div>
+            <div class="am-kpi p-3 h-100 d-flex align-items-center gap-3">
+              <div class="brand-mark"><i class="fa-solid fa-droplet"></i></div>
+              <div>
+                <div class="small am-muted">Conso</div>
+                <div class="fw-semibold">{{ voiture.modele.consommation }} L/100</div>
+              </div>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="am-kpi p-3 h-100">
-              <div class="small am-muted">Vendeur</div>
-              <div class="fw-semibold">{{ voiture.vendeur.username }}</div>
+            <div class="am-kpi p-3 h-100 d-flex align-items-center gap-3">
+              <div class="brand-mark"><i class="fa-regular fa-user"></i></div>
+              <div>
+                <div class="small am-muted">Vendeur</div>
+                <div class="fw-semibold">{{ voiture.vendeur.username }}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -92,6 +105,25 @@
 
         <h2 class="h5 mb-2">Description</h2>
         <p class="mb-0">{{ voiture.description }}</p>
+
+        {% if voiture.images.all %}
+        <div class="am-divider my-4"></div>
+        <div>
+          <h2 class="h6 mb-2">Galerie</h2>
+          <div class="row g-2">
+            {% for img in voiture.images.all %}
+              <div class="col-6 col-md-4">
+                <div class="ratio ratio-4x3 bg-light rounded overflow-hidden">
+                  <img class="am-img-cover am-img-skeleton js-lightbox" src="{{ img.image.url }}"
+                       data-image="{{ img.image.url }}"
+                       onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
+                       alt="Photo supplémentaire">
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
       </div>
     </div>
 
@@ -135,6 +167,9 @@
               </div>
               <div class="small am-muted">{{ a.date_publication|date:"d/m/Y" }}</div>
               <div class="mt-2">{{ a.commentaire }}</div>
+              {% if not a.approuve %}
+                <span class="badge text-bg-secondary mt-2">En attente de validation</span>
+              {% endif %}
             </div>
           {% endfor %}
         </div>
@@ -155,7 +190,7 @@
           <a class="text-decoration-none" href="{% url 'detail_voiture' v.id %}">
             <div class="am-card am-card-hover h-100 overflow-hidden">
               <div class="ratio ratio-16x9 bg-light">
-                <img class="am-img-cover" src="{{ v.image_principale.url }}"
+                <img class="am-img-cover am-img-skeleton" src="{{ v.image_principale.url }}"
                      onerror="this.onerror=null;this.src='{% static 'img/placeholder-car.svg' %}';"
                      alt="{{ v.modele.marque.nom }} {{ v.modele.nom }}" loading="lazy">
               </div>
@@ -181,20 +216,6 @@
         <div class="fw-semibold">Actions</div>
         <span class="badge text-bg-light am-badge">#{{ voiture.id }}</span>
       </div>
-
-      {% if voiture.moderation_status != 'approved' %}
-        <div class="alert alert-info">
-          <div class="fw-semibold">Annonce non publiée</div>
-          {% if voiture.moderation_status == 'rejected' %}
-            <div class="small">Cette annonce a été refusée. Modifiez-la puis renvoyez-la.</div>
-            {% if voiture.moderation_reason %}
-              <div class="small mt-2"><span class="fw-semibold">Motif:</span> {{ voiture.moderation_reason }}</div>
-            {% endif %}
-          {% else %}
-            <div class="small">Cette annonce est en attente de validation.</div>
-          {% endif %}
-        </div>
-      {% endif %}
 
       {% if voiture.est_reservee and transaction_en_attente %}
         {% if user == transaction_en_attente.acheteur %}
@@ -227,13 +248,16 @@
       {% endif %}
 
       <div class="d-grid gap-2">
-        {% if voiture.moderation_status == 'approved' and user.is_authenticated and user != voiture.vendeur and not voiture.est_vendue and not voiture.est_reservee %}
+        {% if user.is_authenticated and user != voiture.vendeur and not voiture.est_vendue and not voiture.est_reservee %}
           <a class="btn btn-success btn-lg" href="{% url 'acheter_voiture' voiture.id %}">
             <i class="fa-solid fa-cart-shopping me-2"></i> Acheter
           </a>
-          <form method="post" action="{% url 'toggle_favori' voiture.id %}">
+          <button class="btn btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#reservationForm" aria-expanded="false">
+            <i class="fa-solid fa-calendar-check me-2"></i> Réserver / Essai
+          </button>
+          <form method="post" action="{% url 'toggle_favori' voiture.id %}" data-ajax>
             {% csrf_token %}
-            <button class="btn btn-outline-danger" type="submit">
+            <button class="btn btn-outline-danger js-favori-btn" type="submit" aria-label="Favori">
               {% if est_favori %}
                 <i class="fa-solid fa-heart me-2"></i> Retirer des favoris
               {% else %}
@@ -273,6 +297,72 @@
         <div class="am-divider my-4"></div>
       {% endif %}
 
+      <div class="collapse" id="reservationForm">
+        <div class="small am-muted mb-2">Réserver un créneau</div>
+        <form class="vstack gap-2" method="post" action="{% url 'reserver_voiture' voiture.id %}" data-ajax>
+          {% csrf_token %}
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label" for="debut">Début</label>
+              <input class="form-control" type="datetime-local" id="debut" name="debut" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="fin">Fin</label>
+              <input class="form-control" type="datetime-local" id="fin" name="fin" required>
+            </div>
+          </div>
+          <div>
+            <label class="form-label" for="type">Type</label>
+            <select class="form-select" id="type" name="type">
+              <option value="reservation">Réservation</option>
+              <option value="essai">Essai</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="note">Note</label>
+            <textarea class="form-control" id="note" name="note" rows="2" placeholder="Préférences, dispo..."></textarea>
+          </div>
+          <div>
+            <label class="form-label" for="signature">Signature électronique</label>
+            <input class="form-control" id="signature" name="signature" placeholder="Tapez votre nom complet" required>
+            <div class="am-form-hint">Fait office de signature électronique interne.</div>
+          </div>
+          <button class="btn btn-outline-primary" type="submit" data-loading>
+            <i class="fa-solid fa-calendar-check me-2"></i> Envoyer la demande
+          </button>
+        </form>
+        <div class="am-divider my-3"></div>
+      </div>
+
+      {% if user.is_authenticated and user == voiture.vendeur %}
+        <div class="mb-3">
+          <div class="small am-muted mb-2">Réservations récentes</div>
+          {% if reservations %}
+            <div class="vstack gap-2">
+              {% for r in reservations %}
+                <div class="p-2 border rounded-3 d-flex align-items-center justify-content-between">
+                  <div>
+                    <div class="fw-semibold">{{ r.client.username }} — {{ r.get_type_display }}</div>
+                    <div class="small am-muted">{{ r.debut|date:"d/m H:i" }} → {{ r.fin|date:"d/m H:i" }}</div>
+                    <div class="small am-muted">{{ r.note|default:'(aucune note)' }}</div>
+                  </div>
+                  <div class="d-flex gap-1">
+                    {% if r.statut == 'en_attente' %}
+                      <form method="post" action="{% url 'reservation_action' r.id 'acceptee' %}" data-ajax>{% csrf_token %}<button class="btn btn-sm btn-success">Accepter</button></form>
+                      <form method="post" action="{% url 'reservation_action' r.id 'refusee' %}" data-ajax>{% csrf_token %}<button class="btn btn-sm btn-outline-danger">Refuser</button></form>
+                    {% else %}
+                      <span class="badge text-bg-light">{{ r.get_statut_display }}</span>
+                    {% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="alert alert-light border mb-0">Aucune demande.</div>
+          {% endif %}
+        </div>
+      {% endif %}
+
       <div>
         <div class="small am-muted mb-2">Partager</div>
         <div class="input-group">
@@ -283,4 +373,32 @@
     </div>
   </aside>
 </div>
+
+<!-- Lightbox modal -->
+<div class="modal fade" id="photoModal" tabindex="-1" aria-labelledby="photoModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content bg-dark">
+      <div class="modal-body p-0">
+        <img id="photoModalImg" src="" alt="Photo voiture" class="w-100">
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+  document.addEventListener("click", (event) => {
+    const img = event.target.closest(".js-lightbox");
+    if (!img) return;
+    const src = img.getAttribute("data-image") || img.getAttribute("src");
+    const modalImg = document.getElementById("photoModalImg");
+    if (modalImg && src) {
+      modalImg.src = src;
+      const modal = new bootstrap.Modal(document.getElementById("photoModal"));
+      modal.show();
+    }
+  });
+</script>
+{% endblock %}
 {% endblock %}

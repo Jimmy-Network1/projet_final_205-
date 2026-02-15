@@ -17,26 +17,19 @@
 </div>
 
 <div class="row g-3 mb-4">
-  <div class="col-md-3">
+  <div class="col-md-4">
     <div class="am-kpi p-3">
       <div class="small am-muted">Total</div>
       <div class="h4 mb-0 value">{{ voitures.count }}</div>
     </div>
   </div>
-  <div class="col-md-3">
+  <div class="col-md-4">
     <div class="am-kpi p-3">
       <div class="small am-muted">En vente</div>
       <div class="h4 mb-0 value">{{ voitures_en_vente }}</div>
     </div>
   </div>
-  <div class="col-md-3">
-    <div class="am-kpi p-3">
-      <div class="small am-muted">En validation</div>
-      <div class="h4 mb-0 value">{{ voitures_en_validation }}</div>
-      <div class="small am-muted mt-1">Refusées: {{ voitures_refusees }}</div>
-    </div>
-  </div>
-  <div class="col-md-3">
+  <div class="col-md-4">
     <div class="am-kpi p-3">
       <div class="small am-muted">Vendues</div>
       <div class="h4 mb-0 value">{{ voitures_vendues }}</div>
@@ -80,25 +73,13 @@
               </td>
               <td class="fw-semibold text-primary am-price">{{ v.prix|fcfa }}</td>
               <td>
-                <div class="d-flex flex-wrap gap-1">
-                  {% if v.moderation_status == 'approved' %}
-                    <span class="badge text-bg-success">Validée</span>
-                  {% elif v.moderation_status == 'rejected' %}
-                    <span class="badge text-bg-danger">Refusée</span>
-                  {% else %}
-                    <span class="badge text-bg-info">En validation</span>
-                  {% endif %}
-
-                  {% if v.est_vendue %}
-                    <span class="badge text-bg-danger">Vendue</span>
-                  {% elif v.est_reservee %}
-                    <span class="badge text-bg-warning">Réservée</span>
-                  {% elif v.moderation_status == 'approved' %}
-                    <span class="badge text-bg-light am-badge">En vente</span>
-                  {% else %}
-                    <span class="badge text-bg-light am-badge">Non publiée</span>
-                  {% endif %}
-                </div>
+                {% if v.est_vendue %}
+                  <span class="badge text-bg-danger">Vendue</span>
+                {% elif v.est_reservee %}
+                  <span class="badge text-bg-warning">Réservée</span>
+                {% else %}
+                  <span class="badge text-bg-success">En vente</span>
+                {% endif %}
               </td>
               <td class="text-nowrap">
                 <div>{{ v.date_ajout|date:"d/m/Y" }}</div>

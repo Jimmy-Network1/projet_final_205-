@@ -4,17 +4,30 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User  # IMPORT AJOUTÉ
 from django.contrib import messages
-from django.db.models import Q, Count, Avg, Sum, Max
+from django.db.models import Q, Count, Avg, Sum
 from django.core.paginator import Paginator
-from django.http import Http404, HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
-from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils import timezone
+from datetime import date
 import os
 from decimal import Decimal, InvalidOperation
-from .models import Conversation, Marque, Modele, Voiture, Favori, Transaction, Avis, Message, Notification
-from .forms import InscriptionForm, AvisForm, MarqueManageForm
-from .services import messaging, receipts, transactions
+from .models import (
+    Marque,
+    Modele,
+    Voiture,
+    Favori,
+    Transaction,
+    Avis,
+    Message,
+    Notification,
+    ImageVoiture,
+    Reservation,
+)
+from .forms import InscriptionForm, AvisForm
+from .services import transactions
+from .services import reservations as res_service
 
 
 def _validate_uploaded_image(uploaded_file):
@@ -44,63 +57,33 @@ def _notify(users, *, type, titre, contenu="", url=""):
         Notification.objects.bulk_create(notifications)
 
 
-def _user_can_view_listing(user, voiture: Voiture) -> bool:
-    if voiture.moderation_status == "approved":
-        return True
-    if not getattr(user, "is_authenticated", False):
-        return False
-    return bool(getattr(user, "is_staff", False) or user == voiture.vendeur)
-
-
-def _assert_listing_visible(user, voiture: Voiture) -> None:
-    if not _user_can_view_listing(user, voiture):
-        raise Http404
-
-
 # ==================== VUES PUBLIQUES ====================
 
 def accueil(request):
     """Page d'accueil du site"""
     transactions.expire_stale_purchase_requests()
-    voitures_recentes = Voiture.objects.filter(
-        est_vendue=False, moderation_status="approved"
-    ).order_by("-date_ajout")[:6]
-    voitures_promo = Voiture.objects.filter(
-        est_vendue=False, moderation_status="approved"
-    ).order_by("prix")[:6]
+    voitures_recentes = Voiture.objects.filter(est_vendue=False).order_by('-date_ajout')[:6]
+    voitures_promo = Voiture.objects.filter(est_vendue=False).order_by('prix')[:6]
     marques_populaires = Marque.objects.annotate(
-        nb_voitures=Count(
-            "modeles__voitures",
-            filter=Q(
-                modeles__voitures__est_vendue=False,
-                modeles__voitures__moderation_status="approved",
-            ),
-        )
+        nb_voitures=Count('modeles__voitures')
     ).order_by('-nb_voitures')[:8]
-
-    marques_home = Marque.objects.all().order_by("nom")[:18]
     
     context = {
         'voitures_recentes': voitures_recentes,
         'voitures_promo': voitures_promo,
         'marques_populaires': marques_populaires,
-        'marques_home': marques_home,
         'marques': Marque.objects.all().order_by('nom'),
-        'voitures_vedette': Voiture.objects.filter(
-            est_vendue=False, moderation_status="approved"
-        ).select_related("modele__marque").order_by("-date_ajout")[:12],
-        'total_voitures': Voiture.objects.filter(est_vendue=False, moderation_status="approved").count(),
+        'voitures_vedette': Voiture.objects.filter(est_vendue=False).select_related('modele__marque').order_by('-date_ajout')[:12],
+        'total_voitures': Voiture.objects.filter(est_vendue=False).count(),
     }
     return render(request, 'voitures/accueil.html', context)
 
 def liste_voitures(request):
     """Liste toutes les voitures avec filtres"""
     transactions.expire_stale_purchase_requests()
-    voitures_list = (
-        Voiture.objects.filter(est_vendue=False, moderation_status="approved")
-        .select_related("modele__marque", "vendeur")
-        .prefetch_related("favoris")
-    )
+    voitures_list = Voiture.objects.filter(est_vendue=False).select_related(
+        'modele__marque', 'vendeur'
+    ).prefetch_related('favoris')
 
     q = request.GET.get("q")
     sort = request.GET.get("sort")
@@ -112,11 +95,6 @@ def liste_voitures(request):
     prix_max = request.GET.get('prix_max')
     annee_min = request.GET.get('annee_min')
     annee_max = request.GET.get('annee_max')
-    etats = request.GET.getlist("etat") or []
-    if len(etats) == 1 and "," in etats[0]:
-        etats = [part.strip() for part in etats[0].split(",") if part.strip()]
-    allowed_etats = {key for key, _ in Voiture.ETAT_CHOICES}
-    etats_selected = [e for e in etats if e in allowed_etats]
 
     if q:
         voitures_list = voitures_list.filter(
@@ -140,9 +118,6 @@ def liste_voitures(request):
     
     if annee_max:
         voitures_list = voitures_list.filter(annee__lte=annee_max)
-
-    if etats_selected:
-        voitures_list = voitures_list.filter(etat__in=etats_selected)
 
     if statut == "reservee":
         voitures_list = voitures_list.filter(est_reservee=True)
@@ -168,7 +143,7 @@ def liste_voitures(request):
     
     context = {
         'voitures': voitures,
-        'marques': Marque.objects.all().order_by("nom"),
+        'marques': Marque.objects.all(),
         'marque_selected': int(marque_id) if marque_id else None,
         'prix_min': prix_min,
         'prix_max': prix_max,
@@ -178,24 +153,18 @@ def liste_voitures(request):
         'q': q,
         'sort': sort,
         'statut': statut,
-        "etat_selected": etats_selected,
     }
     return render(request, 'voitures/liste_voitures.html', context)
-
-
-def liste_marques(request):
-    marques = Marque.objects.all().order_by("nom")
-    return render(request, "voitures/marques.html", {"marques": marques})
-
 
 def detail_voiture(request, voiture_id):
     """Page de détails d'une voiture"""
     transactions.expire_stale_purchase_requests()
-    voiture = get_object_or_404(Voiture.objects.select_related(
-        'modele__marque', 'vendeur'
-    ), id=voiture_id)
-
-    _assert_listing_visible(request.user, voiture)
+    res_service.expire_stale_pending()
+    res_service.expire_finished_reservations()
+    voiture = get_object_or_404(
+        Voiture.objects.select_related('modele__marque', 'vendeur').prefetch_related("images"),
+        id=voiture_id,
+    )
 
     if request.method == "GET":
         if not request.user.is_authenticated or request.user != voiture.vendeur:
@@ -221,8 +190,7 @@ def detail_voiture(request, voiture_id):
     # Voitures similaires
     voitures_similaires = Voiture.objects.filter(
         modele__marque=voiture.modele.marque,
-        est_vendue=False,
-        moderation_status="approved",
+        est_vendue=False
     ).exclude(id=voiture.id)[:4]
     
     context = {
@@ -232,6 +200,7 @@ def detail_voiture(request, voiture_id):
         'voitures_similaires': voitures_similaires,
         'avis_form': AvisForm(),
         "transaction_en_attente": transaction_en_attente,
+        "reservations": voiture.reservations.all()[:10],
     }
     return render(request, 'voitures/detail_voiture.html', context)
 
@@ -297,7 +266,10 @@ def ajouter_voiture(request):
     if request.method == 'POST':
         try:
             # Récupération des données du formulaire
-            marque_id = request.POST.get('marque')
+            marque_choice = request.POST.get('marque')
+            new_marque_nom = (request.POST.get("new_marque_nom") or "").strip()
+            new_marque_pays = (request.POST.get("new_marque_pays") or "Non spécifié").strip() or "Non spécifié"
+            new_marque_date_raw = (request.POST.get("new_marque_date") or "").strip()
             modele_nom = (request.POST.get('modele') or "").strip()
             prix_raw = request.POST.get('prix')
             kilometrage_raw = request.POST.get('kilometrage')
@@ -310,16 +282,8 @@ def ajouter_voiture(request):
             puissance_raw = request.POST.get("puissance")
             consommation_raw = request.POST.get("consommation")
 
-            if not marque_id:
-                messages.error(
-                    request,
-                    "Aucune marque n'est disponible. Ajoutez d'abord des marques (admin) ou exécutez "
-                    "`python manage.py init_catalog`.",
-                )
-                return redirect("ajouter_voiture")
-
-            if not (marque_id and modele_nom and prix_raw and kilometrage_raw and annee_raw and couleur and etat and description):
-                messages.error(request, "Veuillez remplir tous les champs obligatoires.")
+            if not ((marque_choice or new_marque_nom) and modele_nom and prix_raw and kilometrage_raw and annee_raw and couleur and etat and description):
+                messages.error(request, "Veuillez remplir tous les champs obligatoires (dont marque et modèle).")
                 return redirect("ajouter_voiture")
 
             try:
@@ -357,7 +321,25 @@ def ajouter_voiture(request):
                 consommation = 6.0
             
             # Création ou récupération de la marque et du modèle
-            marque = get_object_or_404(Marque, id=marque_id)
+            if marque_choice == "__new__":
+                if not new_marque_nom:
+                    messages.error(request, "Indiquez le nom de la nouvelle marque.")
+                    return redirect("ajouter_voiture")
+                try:
+                    parsed_date = date.fromisoformat(new_marque_date_raw) if new_marque_date_raw else timezone.now().date()
+                except ValueError:
+                    parsed_date = timezone.now().date()
+                marque, _created = Marque.objects.get_or_create(
+                    nom=new_marque_nom,
+                    defaults={
+                        "pays": new_marque_pays or "Non spécifié",
+                        "date_creation": parsed_date,
+                        "description": "",
+                    },
+                )
+            else:
+                marque = get_object_or_404(Marque, id=marque_choice)
+
             modele, created = Modele.objects.get_or_create(
                 marque=marque,
                 nom=modele_nom,
@@ -369,9 +351,6 @@ def ajouter_voiture(request):
                     'consommation': consommation,
                 }
             )
-            if not created:
-                # On conserve la fiche modèle existante pour rester cohérent (nom unique par marque).
-                pass
             
             # Création de la voiture
             voiture = Voiture.objects.create(
@@ -385,7 +364,7 @@ def ajouter_voiture(request):
                 vendeur=request.user
             )
             
-            # Gestion de l'image
+            # Gestion de l'image principale
             if 'image' in request.FILES:
                 error = _validate_uploaded_image(request.FILES["image"])
                 if error:
@@ -394,23 +373,31 @@ def ajouter_voiture(request):
                     return redirect("ajouter_voiture")
                 voiture.image_principale = request.FILES['image']
                 voiture.save()
+
+            # Images supplémentaires
+            extra_images = request.FILES.getlist("images")
+            ordre = 0
+            for img in extra_images:
+                error = _validate_uploaded_image(img)
+                if error:
+                    messages.warning(request, f"Image ignorée: {error}")
+                    continue
+                ImageVoiture.objects.create(voiture=voiture, image=img, ordre=ordre)
+                ordre += 1
             
-            messages.success(
-                request,
-                "Annonce envoyée. Elle sera visible publiquement après validation.",
-            )
+            messages.success(request, 'Votre annonce a été publiée avec succès !')
             _notify(
-                [request.user],
-                type="listing_moderation",
-                titre="Annonce en attente de validation",
-                contenu=f"Votre annonce #{voiture.id} sera publiée après validation.",
+                _staff_users(),
+                type="new_listing",
+                titre="Nouvelle annonce publiée",
+                contenu=f"{request.user.username} a publié l'annonce #{voiture.id}.",
                 url=voiture.get_absolute_url(),
             )
             _notify(
-                _staff_users(),
-                type="listing_moderation",
-                titre="Annonce à valider",
-                contenu=f"{request.user.username} a soumis l'annonce #{voiture.id}.",
+                User.objects.filter(is_active=True).exclude(id=request.user.id),
+                type="new_listing",
+                titre="Nouvelle voiture disponible",
+                contenu=f"{voiture.modele.marque.nom} {voiture.modele.nom} ({voiture.annee}).",
                 url=voiture.get_absolute_url(),
             )
             return redirect('detail_voiture', voiture_id=voiture.id)
@@ -419,7 +406,7 @@ def ajouter_voiture(request):
             messages.error(request, f'Erreur lors de la création : {str(e)}')
     
     # GET request - afficher le formulaire
-    marques = Marque.objects.all().order_by("nom")
+    marques = Marque.objects.all()
     context = {'marques': marques}
     return render(request, 'voitures/ajouter_voiture.html', context)
 
@@ -435,7 +422,6 @@ def modifier_voiture(request, voiture_id):
     
     if request.method == 'POST':
         try:
-            previous_moderation_status = voiture.moderation_status
             # Récupérer les données du formulaire
             prix_raw = request.POST.get('prix')
             kilometrage_raw = request.POST.get('kilometrage')
@@ -465,19 +451,6 @@ def modifier_voiture(request, voiture_id):
             voiture.kilometrage = kilometrage
             voiture.description = description
             voiture.est_vendue = est_vendue
-
-            if previous_moderation_status in {"approved", "rejected"}:
-                voiture.moderation_status = "pending"
-                voiture.moderation_reason = ""
-                voiture.moderated_at = None
-                voiture.moderated_by = None
-                _notify(
-                    _staff_users(),
-                    type="listing_moderation",
-                    titre="Annonce modifiée à revalider",
-                    contenu=f"{request.user.username} a modifié l'annonce #{voiture.id}.",
-                    url=voiture.get_absolute_url(),
-                )
             
             # Gestion de l'image
             if 'image' in request.FILES:
@@ -488,13 +461,7 @@ def modifier_voiture(request, voiture_id):
                 voiture.image_principale = request.FILES['image']
             
             voiture.save()
-            if previous_moderation_status in {"approved", "rejected"}:
-                messages.success(
-                    request,
-                    "Annonce mise à jour. Elle repasse en validation avant publication.",
-                )
-            else:
-                messages.success(request, "Annonce mise à jour avec succès !")
+            messages.success(request, 'Annonce mise à jour avec succès !')
             return redirect('detail_voiture', voiture_id=voiture.id)
             
         except Exception as e:
@@ -529,8 +496,10 @@ def supprimer_voiture(request, voiture_id):
 def toggle_favori(request, voiture_id):
     """Ajouter/retirer une voiture des favoris"""
     if request.method != "POST":
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": "Méthode non autorisée."}, status=405)
         return redirect('detail_voiture', voiture_id=voiture_id)
-    voiture = get_object_or_404(Voiture, id=voiture_id, moderation_status="approved")
+    voiture = get_object_or_404(Voiture, id=voiture_id)
     
     # Vérifier si déjà en favori
     favori, created = Favori.objects.get_or_create(
@@ -541,8 +510,12 @@ def toggle_favori(request, voiture_id):
     if not created:
         favori.delete()
         messages.info(request, 'Voiture retirée des favoris.')
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": True, "favori": False, "message": "Retirée des favoris"})
     else:
         messages.success(request, 'Voiture ajoutée aux favoris.')
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": True, "favori": True, "message": "Ajoutée aux favoris"})
     
     return redirect('detail_voiture', voiture_id=voiture_id)
 
@@ -550,7 +523,7 @@ def toggle_favori(request, voiture_id):
 @login_required
 @require_POST
 def ajouter_avis(request, voiture_id):
-    voiture = get_object_or_404(Voiture, id=voiture_id, moderation_status="approved")
+    voiture = get_object_or_404(Voiture, id=voiture_id)
     if request.user == voiture.vendeur:
         messages.error(request, "Vous ne pouvez pas noter votre propre annonce.")
         return redirect("detail_voiture", voiture_id=voiture_id)
@@ -571,13 +544,6 @@ def ajouter_avis(request, voiture_id):
             avis.commentaire = form.cleaned_data["commentaire"]
             avis.approuve = False
             avis.save(update_fields=["note", "commentaire", "approuve"])
-        _notify(
-            _staff_users(),
-            type="message",
-            titre="Avis à valider",
-            contenu=f"Avis en attente sur l'annonce #{voiture.id} (par {request.user.username}).",
-            url=voiture.get_absolute_url(),
-        )
         messages.success(request, "Avis envoyé. Il sera visible après validation.")
     else:
         messages.error(request, "Avis invalide. Vérifiez les champs.")
@@ -587,11 +553,7 @@ def ajouter_avis(request, voiture_id):
 @login_required
 @require_POST
 def envoyer_message(request, voiture_id):
-    voiture = get_object_or_404(
-        Voiture.objects.select_related("vendeur", "modele__marque", "modele"),
-        id=voiture_id,
-        moderation_status="approved",
-    )
+    voiture = get_object_or_404(Voiture.objects.select_related("vendeur", "modele__marque", "modele"), id=voiture_id)
     if request.user == voiture.vendeur:
         messages.error(request, "Vous ne pouvez pas vous envoyer un message à vous-même.")
         return redirect("detail_voiture", voiture_id=voiture_id)
@@ -601,173 +563,37 @@ def envoyer_message(request, voiture_id):
         messages.error(request, "Message vide.")
         return redirect("detail_voiture", voiture_id=voiture_id)
 
-    sujet = f"Annonce #{voiture.id} — {voiture.modele.marque.nom} {voiture.modele.nom}"
-    result = messaging.send_message(
-        sender=request.user,
-        recipient=voiture.vendeur,
+    Message.objects.create(
+        expediteur=request.user,
+        destinataire=voiture.vendeur,
+        sujet=f"Annonce #{voiture.id} — {voiture.modele.marque.nom} {voiture.modele.nom}",
         contenu=contenu,
-        sujet=sujet,
-        voiture=voiture,
-        is_support=False,
     )
-
     _notify(
         [voiture.vendeur],
         type="message",
         titre="Nouveau message",
         contenu=f"Message reçu pour l'annonce #{voiture.id}.",
-        url=f"/messages/{result.conversation.id}/",
+        url=voiture.get_absolute_url(),
     )
-    messages.success(request, "Message envoyé.")
-    return redirect("conversation_detail", conversation_id=result.conversation.id)
+    messages.success(request, "Message envoyé au vendeur.")
+    return redirect("detail_voiture", voiture_id=voiture_id)
 
 
 @login_required
 def mes_messages(request):
-    conversations_qs = messaging.get_user_conversations_queryset(user=request.user).annotate(
-        last_date=Max("messages__date_envoi"),
-        unread_count=Count(
-            "messages",
-            filter=Q(messages__destinataire=request.user, messages__lu=False),
-        ),
-    ).order_by("-last_date", "-updated_at")
-    conversations = list(conversations_qs)
-    if conversations:
-        last_messages = (
-            Message.objects.filter(conversation__in=conversations)
-            .select_related("expediteur")
-            .order_by("conversation_id", "-date_envoi")
-        )
-    else:
-        last_messages = []
+    recus = Message.objects.filter(destinataire=request.user).select_related("expediteur").order_by("-date_envoi")
+    envoyes = Message.objects.filter(expediteur=request.user).select_related("destinataire").order_by("-date_envoi")
 
-    last_by_conversation: dict[int, Message] = {}
-    for m in last_messages:
-        if m.conversation_id not in last_by_conversation:
-            last_by_conversation[m.conversation_id] = m
+    tab = request.GET.get("tab", "recus")
+    if tab not in {"recus", "envoyes"}:
+        tab = "recus"
 
-    cards = []
-    for convo in conversations:
-        other = convo.participant_b if convo.participant_a_id == request.user.id else convo.participant_a
-        cards.append(
-            {
-                "conversation": convo,
-                "other": other,
-                "last_message": last_by_conversation.get(convo.id),
-            }
-        )
+    if tab == "recus":
+        Message.objects.filter(destinataire=request.user, lu=False).update(lu=True)
 
-    return render(request, "voitures/mes_messages.html", {"cards": cards})
-
-
-@login_required
-def conversation_detail(request, conversation_id):
-    convo = get_object_or_404(
-        Conversation.objects.select_related(
-            "participant_a",
-            "participant_b",
-            "voiture",
-            "voiture__modele",
-            "voiture__modele__marque",
-        ),
-        id=conversation_id,
-    )
-    if not messaging.user_can_access_conversation(convo=convo, user=request.user):
-        raise Http404
-
-    other = convo.other_for(request.user)
-    if not other and request.user.is_staff:
-        other = convo.participant_b
-
-    if request.method == "POST":
-        contenu = (request.POST.get("contenu") or "").strip()
-        if not contenu:
-            messages.error(request, "Message vide.")
-            return redirect("conversation_detail", conversation_id=convo.id)
-        if not other:
-            messages.error(request, "Destinataire introuvable.")
-            return redirect("mes_messages")
-
-        subject = (
-            f"Annonce #{convo.voiture.id} — {convo.voiture.modele.marque.nom} {convo.voiture.modele.nom}"
-            if convo.voiture_id
-            else "Support AutoMarket"
-        )
-        messaging.send_message(
-            sender=request.user,
-            recipient=other,
-            contenu=contenu,
-            sujet=subject,
-            voiture=convo.voiture,
-            is_support=convo.is_support,
-        )
-        return redirect("conversation_detail", conversation_id=convo.id)
-
-    Message.objects.filter(conversation=convo, destinataire=request.user, lu=False).update(lu=True)
-    msgs = convo.messages.select_related("expediteur", "destinataire").order_by("date_envoi")
-    return render(
-        request,
-        "voitures/conversation.html",
-        {"conversation": convo, "messages": msgs, "other": other},
-    )
-
-
-@login_required
-def support_inbox(request):
-    if not request.user.is_staff:
-        return redirect("accueil")
-
-    conversations = (
-        Conversation.objects.filter(is_support=True)
-        .select_related(
-            "participant_a",
-            "participant_b",
-            "voiture",
-            "voiture__modele",
-            "voiture__modele__marque",
-        )
-        .annotate(
-            last_date=Max("messages__date_envoi"),
-            unread_count=Count(
-                "messages",
-                filter=Q(messages__destinataire=request.user, messages__lu=False),
-            ),
-        )
-        .order_by("-last_date", "-updated_at")[:100]
-    )
-
-    q = (request.GET.get("q") or "").strip()
-    users = []
-    if q:
-        users = list(
-            User.objects.filter(Q(username__icontains=q) | Q(email__icontains=q))
-            .filter(is_active=True)
-            .order_by("username")[:20]
-        )
-
-    return render(
-        request,
-        "admin/support_inbox.html",
-        {"conversations": conversations, "q": q, "users": users},
-    )
-
-
-@login_required
-def support_start(request, user_id):
-    if not request.user.is_staff:
-        return redirect("accueil")
-
-    other = get_object_or_404(User, id=user_id, is_active=True)
-    if other.id == request.user.id:
-        return redirect("support_inbox")
-
-    convo = messaging.get_or_create_conversation(
-        user1=request.user,
-        user2=other,
-        voiture=None,
-        is_support=True,
-    )
-    return redirect("conversation_detail", conversation_id=convo.id)
+    context = {"recus": recus, "envoyes": envoyes, "tab": tab}
+    return render(request, "voitures/mes_messages.html", context)
 
 
 @login_required
@@ -779,15 +605,14 @@ def notifications(request):
 @login_required
 def acheter_voiture(request, voiture_id):
     """Processus d'achat d'une voiture"""
-    voiture = get_object_or_404(
-        Voiture,
-        id=voiture_id,
-        est_vendue=False,
-        moderation_status="approved",
-    )
+    voiture = get_object_or_404(Voiture, id=voiture_id, est_vendue=False)
     
     if request.user == voiture.vendeur:
         messages.error(request, 'Vous ne pouvez pas acheter votre propre voiture.')
+        return redirect('detail_voiture', voiture_id=voiture_id)
+
+    if voiture.est_reservee and not voiture.transactions.filter(statut="en_attente").exists():
+        messages.info(request, "Cette voiture est réservée pour un essai. Réessayez plus tard.")
         return redirect('detail_voiture', voiture_id=voiture_id)
 
     if voiture.est_reservee:
@@ -845,18 +670,14 @@ def mes_voitures(request):
     voitures = Voiture.objects.filter(vendeur=request.user).order_by('-date_ajout')
     
     # Calcul des statistiques
-    voitures_en_vente = voitures.filter(est_vendue=False, moderation_status="approved").count()
+    voitures_en_vente = voitures.filter(est_vendue=False).count()
     voitures_vendues = voitures.filter(est_vendue=True).count()
-    voitures_en_validation = voitures.filter(moderation_status="pending").count()
-    voitures_refusees = voitures.filter(moderation_status="rejected").count()
     total_favoris = Favori.objects.filter(voiture__vendeur=request.user).count()
     
     context = {
         'voitures': voitures,
         'voitures_en_vente': voitures_en_vente,
         'voitures_vendues': voitures_vendues,
-        "voitures_en_validation": voitures_en_validation,
-        "voitures_refusees": voitures_refusees,
         'total_favoris': total_favoris,
     }
     return render(request, 'voitures/mes_voitures.html', context)
@@ -893,35 +714,37 @@ def mes_ventes(request):
 
 
 @login_required
-def telecharger_recu_transaction(request, transaction_id, role):
-    if role not in {"buyer", "seller"}:
-        raise Http404
+def mes_reservations(request):
+    """Réservations faites par l'utilisateur (client)."""
+    res_list = Reservation.objects.filter(client=request.user).select_related(
+        "voiture__modele__marque", "voiture__vendeur"
+    ).order_by("-date_creation")
 
-    trx = get_object_or_404(
-        Transaction.objects.select_related(
-            "voiture__modele__marque",
-            "voiture__modele",
-            "acheteur",
-            "vendeur",
-        ),
-        id=transaction_id,
-    )
+    paginator = Paginator(res_list, 12)
+    page_number = request.GET.get("page")
+    reservations = paginator.get_page(page_number)
 
-    if trx.statut not in {"confirmee", "terminee"}:
-        raise Http404
+    context = {
+        "reservations": reservations,
+    }
+    return render(request, "voitures/mes_reservations.html", context)
 
-    if not request.user.is_staff:
-        if role == "buyer" and trx.acheteur_id != request.user.id:
-            raise Http404
-        if role == "seller" and trx.vendeur_id != request.user.id:
-            raise Http404
 
-    pdf_bytes = receipts.build_transaction_receipt(transaction=trx, role=role)
-    filename = f"recu_transaction_{trx.id}_{role}.pdf"
+@login_required
+def reservations_a_traiter(request):
+    """Réservations en attente sur les voitures du vendeur."""
+    res_list = Reservation.objects.filter(
+        voiture__vendeur=request.user, statut__in=["en_attente", "acceptee"]
+    ).select_related("voiture__modele__marque", "client").order_by("-date_creation")
 
-    response = HttpResponse(pdf_bytes, content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
-    return response
+    paginator = Paginator(res_list, 20)
+    page_number = request.GET.get("page")
+    reservations = paginator.get_page(page_number)
+
+    context = {
+        "reservations": reservations,
+    }
+    return render(request, "voitures/reservations_a_traiter.html", context)
 
 @login_required
 def confirmer_vente(request, transaction_id):
@@ -969,6 +792,115 @@ def annuler_transaction(request, transaction_id):
     )
     messages.info(request, "Demande annulée.")
     return redirect("mes_achats")
+
+
+@login_required
+def reserver_voiture(request, voiture_id):
+    """Réserver un créneau (essai ou blocage)"""
+    voiture = get_object_or_404(Voiture.objects.select_related("vendeur"), id=voiture_id, est_vendue=False)
+
+    if request.user == voiture.vendeur:
+        messages.error(request, "Vous ne pouvez pas réserver votre propre voiture.")
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": "Impossible de réserver votre propre voiture."}, status=400)
+        return redirect("detail_voiture", voiture_id=voiture_id)
+
+    if request.method == "POST":
+        debut_raw = request.POST.get("debut")
+        fin_raw = request.POST.get("fin")
+        type_res = request.POST.get("type") or "reservation"
+        note = (request.POST.get("note") or "").strip()
+        signature = (request.POST.get("signature") or "").strip()
+
+        if not debut_raw or not fin_raw:
+            messages.error(request, "Veuillez choisir un créneau.")
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "error": "Veuillez choisir un créneau."}, status=400)
+            return redirect("detail_voiture", voiture_id=voiture_id)
+
+        try:
+            debut = timezone.make_aware(datetime.fromisoformat(debut_raw))
+            fin = timezone.make_aware(datetime.fromisoformat(fin_raw))
+            res = res_service.create_reservation(
+                voiture_id=voiture.id,
+                client=request.user,
+                debut=debut,
+                fin=fin,
+                type=type_res,
+                note=note,
+                signature=signature,
+            )
+            _notify(
+                [voiture.vendeur],
+                type="purchase_request",
+                titre="Nouvelle réservation",
+                contenu=f"{request.user.username} demande un créneau sur #{voiture.id}.",
+                url=voiture.get_absolute_url(),
+            )
+            messages.success(request, "Demande de réservation envoyée. Le vendeur doit confirmer.")
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": True, "reservation_id": res.id, "message": "Demande envoyée"})
+        except ValueError as e:
+            messages.error(request, str(e))
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "error": str(e)}, status=400)
+        except Exception as e:
+            messages.error(request, f"Erreur: {e}")
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "error": str(e)}, status=400)
+
+        return redirect("detail_voiture", voiture_id=voiture_id)
+
+    return redirect("detail_voiture", voiture_id=voiture_id)
+
+
+@login_required
+@require_POST
+def reservation_action(request, reservation_id, action):
+    """Vendeur ou client change le statut (accepter/refuser/annuler)."""
+    try:
+        res = res_service.update_status(reservation_id=reservation_id, user=request.user, new_status=action)
+        voiture = res.voiture
+        if action == "acceptee":
+            _notify(
+                [res.client],
+                type="purchase_request",
+                titre="Réservation acceptée",
+                contenu=f"Votre créneau pour l'annonce #{voiture.id} est confirmé.",
+                url=voiture.get_absolute_url(),
+            )
+            messages.success(request, "Réservation acceptée.")
+        elif action == "refusee":
+            _notify(
+                [res.client],
+                type="purchase_request",
+                titre="Réservation refusée",
+                contenu=f"La réservation pour l'annonce #{voiture.id} a été refusée.",
+                url=voiture.get_absolute_url(),
+            )
+            messages.info(request, "Réservation refusée.")
+        elif action == "annulee":
+            _notify(
+                [res.voiture.vendeur],
+                type="purchase_request",
+                titre="Réservation annulée",
+                contenu=f"{request.user.username} a annulé la réservation sur #{voiture.id}.",
+                url=voiture.get_absolute_url(),
+            )
+            messages.info(request, "Réservation annulée.")
+
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": True, "reservation_id": res.id, "statut": res.statut})
+    except PermissionError:
+        messages.error(request, "Action non autorisée.")
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": "Action non autorisée."}, status=403)
+    except Exception as e:
+        messages.error(request, f"Erreur: {e}")
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": str(e)}, status=400)
+
+    return redirect("detail_voiture", voiture_id=res.voiture_id if 'res' in locals() else 0)
 
 
 @login_required
@@ -1020,16 +952,6 @@ def dashboard(request):
         'modele__marque', 'vendeur'
     ).order_by('-date_ajout')[:10]
 
-    voitures_a_valider = Voiture.objects.filter(moderation_status="pending").select_related(
-        "modele__marque", "vendeur"
-    ).order_by("-date_ajout")[:10]
-
-    avis_a_valider = Avis.objects.filter(approuve=False).select_related(
-        "voiture__modele__marque",
-        "voiture__modele",
-        "utilisateur",
-    ).order_by("-date_publication")[:10]
-
     notifications_recentes = Notification.objects.filter(utilisateur=request.user).order_by("-date_creation")[:10]
     
     context = {
@@ -1040,193 +962,9 @@ def dashboard(request):
         'transactions_recentes': transactions_recentes,
         'transactions_en_attente': transactions_en_attente,
         'voitures_recentes': voitures_recentes,
-        "voitures_a_valider": voitures_a_valider,
-        "avis_a_valider": avis_a_valider,
         'notifications_recentes': notifications_recentes,
     }
     return render(request, 'admin/dashboard.html', context)
-
-
-@login_required
-def dashboard_marques(request):
-    if not request.user.is_staff:
-        return redirect("accueil")
-
-    marques = Marque.objects.all().order_by("nom")
-    return render(request, "admin/marques_list.html", {"marques": marques})
-
-
-@login_required
-def dashboard_marque_add(request):
-    if not request.user.is_staff:
-        return redirect("accueil")
-
-    if request.method == "POST":
-        form = MarqueManageForm(request.POST, request.FILES)
-        logo_file = request.FILES.get("logo")
-        if logo_file:
-            error = _validate_uploaded_image(logo_file)
-            if error:
-                form.add_error("logo", error)
-        if form.is_valid():
-            marque = form.save()
-            messages.success(request, f"Marque créée: {marque.nom}")
-            return redirect("dashboard_marques")
-    else:
-        form = MarqueManageForm()
-
-    return render(
-        request,
-        "admin/marques_form.html",
-        {"form": form, "title": "Ajouter une marque", "submit_label": "Créer"},
-    )
-
-
-@login_required
-def dashboard_marque_edit(request, marque_id: int):
-    if not request.user.is_staff:
-        return redirect("accueil")
-
-    marque = get_object_or_404(Marque, id=marque_id)
-    if request.method == "POST":
-        form = MarqueManageForm(request.POST, request.FILES, instance=marque)
-        logo_file = request.FILES.get("logo")
-        if logo_file:
-            error = _validate_uploaded_image(logo_file)
-            if error:
-                form.add_error("logo", error)
-        if form.is_valid():
-            marque = form.save()
-            messages.success(request, f"Marque mise à jour: {marque.nom}")
-            return redirect("dashboard_marques")
-    else:
-        form = MarqueManageForm(instance=marque)
-
-    return render(
-        request,
-        "admin/marques_form.html",
-        {
-            "form": form,
-            "title": f"Modifier la marque — {marque.nom}",
-            "submit_label": "Enregistrer",
-            "marque": marque,
-        },
-    )
-
-
-@login_required
-def dashboard_marque_delete(request, marque_id: int):
-    if not request.user.is_staff:
-        return redirect("accueil")
-
-    marque = get_object_or_404(Marque, id=marque_id)
-    modele_count = marque.modeles.count()
-    voiture_count = Voiture.objects.filter(modele__marque=marque).count()
-
-    if request.method == "POST":
-        name = marque.nom
-        marque.delete()
-        messages.info(request, f"Marque supprimée: {name}")
-        return redirect("dashboard_marques")
-
-    return render(
-        request,
-        "admin/marques_confirm_delete.html",
-        {"marque": marque, "modele_count": modele_count, "voiture_count": voiture_count},
-    )
-
-
-@login_required
-@require_POST
-def moderer_annonce(request, voiture_id):
-    if not request.user.is_staff:
-        return redirect("accueil")
-
-    voiture = get_object_or_404(Voiture.objects.select_related("vendeur", "modele__marque", "modele"), id=voiture_id)
-    action = (request.POST.get("action") or "").strip().lower()
-    reason = (request.POST.get("reason") or "").strip()
-
-    if action not in {"approve", "reject"}:
-        messages.error(request, "Action invalide.")
-        return redirect("dashboard")
-
-    if action == "reject" and not reason:
-        messages.error(request, "Motif obligatoire pour refuser une annonce.")
-        return redirect("dashboard")
-
-    if action == "approve":
-        voiture.moderation_status = "approved"
-        voiture.moderation_reason = ""
-        voiture.moderated_at = timezone.now()
-        voiture.moderated_by = request.user
-        voiture.save(update_fields=["moderation_status", "moderation_reason", "moderated_at", "moderated_by"])
-
-        _notify(
-            [voiture.vendeur],
-            type="listing_moderation",
-            titre="Annonce approuvée",
-            contenu=f"Votre annonce #{voiture.id} est maintenant visible.",
-            url=voiture.get_absolute_url(),
-        )
-        messages.success(request, f"Annonce #{voiture.id} approuvée.")
-        return redirect("dashboard")
-
-    # reject
-    voiture.moderation_status = "rejected"
-    voiture.moderation_reason = reason
-    voiture.moderated_at = timezone.now()
-    voiture.moderated_by = request.user
-    voiture.save(update_fields=["moderation_status", "moderation_reason", "moderated_at", "moderated_by"])
-
-    _notify(
-        [voiture.vendeur],
-        type="listing_moderation",
-        titre="Annonce refusée",
-        contenu=f"Annonce #{voiture.id} refusée: {reason}",
-        url=voiture.get_absolute_url(),
-    )
-    try:
-        messaging.send_message(
-            sender=request.user,
-            recipient=voiture.vendeur,
-            contenu=f"Votre annonce #{voiture.id} a été refusée.\n\nMotif: {reason}",
-            sujet=f"Refus annonce #{voiture.id}",
-            voiture=voiture,
-            is_support=True,
-        )
-    except Exception:
-        pass
-    messages.info(request, f"Annonce #{voiture.id} refusée.")
-    return redirect("dashboard")
-
-
-@login_required
-@require_POST
-def moderer_avis(request, avis_id):
-    if not request.user.is_staff:
-        return redirect("accueil")
-
-    avis = get_object_or_404(Avis.objects.select_related("voiture", "utilisateur"), id=avis_id)
-    action = (request.POST.get("action") or "").strip().lower()
-    if action not in {"approve", "reject"}:
-        messages.error(request, "Action invalide.")
-        return redirect("dashboard")
-
-    if action == "approve":
-        Avis.objects.filter(id=avis.id).update(approuve=True)
-        _notify(
-            [avis.utilisateur],
-            type="message",
-            titre="Avis approuvé",
-            contenu=f"Votre avis sur l'annonce #{avis.voiture_id} est maintenant visible.",
-            url=avis.voiture.get_absolute_url(),
-        )
-        messages.success(request, "Avis approuvé.")
-        return redirect("dashboard")
-
-    Avis.objects.filter(id=avis.id).delete()
-    messages.info(request, "Avis refusé (supprimé).")
-    return redirect("dashboard")
 
 # ==================== VUES D'ERREUR ====================
 

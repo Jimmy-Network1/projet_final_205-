@@ -2,7 +2,6 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from voitures.models import Marque, Modele, Voiture
-from django.utils import timezone
 import datetime
 
 class Command(BaseCommand):
@@ -225,9 +224,7 @@ class Command(BaseCommand):
                 'couleur': 'noir',
                 'etat': 'occasion',
                 'description': 'SUV familial spacieux, très bon état général.',
-                'vendeur': vendeurs[0],
-                "moderation_status": "approved",
-                "moderated_at": timezone.now(),
+                'vendeur': vendeurs[0]
             },
             # Renault Captur
             {
@@ -238,9 +235,7 @@ class Command(BaseCommand):
                 'couleur': 'bleu',
                 'etat': 'occasion',
                 'description': 'Captur crossback, idéal pour la ville.',
-                'vendeur': vendeurs[1],
-                "moderation_status": "approved",
-                "moderated_at": timezone.now(),
+                'vendeur': vendeurs[1]
             },
             # Volkswagen Passat
             {
@@ -251,9 +246,7 @@ class Command(BaseCommand):
                 'couleur': 'gris',
                 'etat': 'occasion',
                 'description': 'Passat diesel, confortable et spacieuse.',
-                'vendeur': vendeurs[2],
-                "moderation_status": "approved",
-                "moderated_at": timezone.now(),
+                'vendeur': vendeurs[2]
             },
         ]
         

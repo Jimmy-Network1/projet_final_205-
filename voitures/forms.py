@@ -189,16 +189,3 @@ class SetPasswordStyledForm(SetPasswordForm):
         super().__init__(user, *args, **kwargs)
         for name in ("new_password1", "new_password2"):
             self.fields[name].widget.attrs.update({"class": "form-control"})
-
-
-class MarqueManageForm(forms.ModelForm):
-    class Meta:
-        model = Marque
-        fields = ["nom", "pays", "date_creation", "logo", "description"]
-        widgets = {
-            "nom": forms.TextInput(attrs={"class": "form-control"}),
-            "pays": forms.TextInput(attrs={"class": "form-control"}),
-            "date_creation": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
-            "logo": forms.ClearableFileInput(attrs={"class": "form-control", "accept": "image/*"}),
-            "description": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
-        }

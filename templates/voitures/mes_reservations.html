@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Mes réservations - AutoMarket{% endblock %}
+{% block main_class %}container py-4{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-1">Mes réservations</h1>
+    <p class="am-muted mb-0">Vos demandes d'essai ou de blocage de véhicule.</p>
+  </div>
+</div>
+
+<div class="am-card overflow-hidden">
+  {% if reservations %}
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Voiture</th>
+            <th class="text-nowrap">Créneau</th>
+            <th class="text-nowrap">Type</th>
+            <th class="text-nowrap">Statut</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in reservations %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ r.voiture.modele.marque.nom }} {{ r.voiture.modele.nom }}</div>
+                <div class="small am-muted">Vendeur : {{ r.voiture.vendeur.username }}</div>
+              </td>
+              <td class="text-nowrap">
+                <div>{{ r.debut|date:"d/m H:i" }} → {{ r.fin|date:"d/m H:i" }}</div>
+                <div class="small am-muted">{{ r.date_creation|timesince }} ago</div>
+              </td>
+              <td>{{ r.get_type_display }}</td>
+              <td>
+                {% if r.statut == 'acceptee' %}
+                  <span class="badge text-bg-success">{{ r.get_statut_display }}</span>
+                {% elif r.statut == 'en_attente' %}
+                  <span class="badge text-bg-warning">{{ r.get_statut_display }}</span>
+                {% elif r.statut == 'refusee' %}
+                  <span class="badge text-bg-danger">{{ r.get_statut_display }}</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">{{ r.get_statut_display }}</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                {% if r.statut == 'en_attente' %}
+                  <form class="d-inline" method="post" action="{% url 'reservation_action' r.id 'annulee' %}" data-ajax>
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Annuler</button>
+                  </form>
+                {% else %}
+                  <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="p-3">
+      {% if reservations.has_other_pages %}
+        <nav aria-label="Pagination">
+          <ul class="pagination mb-0">
+            {% if reservations.has_previous %}
+              <li class="page-item"><a class="page-link" href="?page={{ reservations.previous_page_number }}">Précédent</a></li>
+            {% endif %}
+            <li class="page-item disabled"><span class="page-link">Page {{ reservations.number }} / {{ reservations.paginator.num_pages }}</span></li>
+            {% if reservations.has_next %}
+              <li class="page-item"><a class="page-link" href="?page={{ reservations.next_page_number }}">Suivant</a></li>
+            {% endif %}
+          </ul>
+        </nav>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="p-4">
+      <div class="alert alert-info mb-0">Aucune réservation pour le moment.</div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
